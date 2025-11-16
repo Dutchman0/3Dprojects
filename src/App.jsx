@@ -18,11 +18,11 @@ export default function NFTCubeInterface() {
 
   // Tommy DeVito memorabilia images for each face
   const faceImages = [
-    'https://www.authenticheroes.com/wp-content/uploads/2025/11/image000001-225x300.jpg',
-    'https://www.authenticheroes.com/wp-content/uploads/2025/11/image000000.jpg',
-    'https://www.authenticheroes.com/wp-content/uploads/2025/11/image000004.jpg',
-    'https://www.authenticheroes.com/wp-content/uploads/2025/11/image000003.jpg',
-    'https://www.authenticheroes.com/wp-content/uploads/2025/11/image000002.jpg',
+    'https://dweb.link/ipfs/QmVqSPDQ3PXMfYoZN7RwfnqATXKbroegZBjxe4qYTLhKR3',
+    'https://dweb.link/ipfs/QmQXMB45tfidy3YqZ9hi7A69HrgjU3jYrM5WJwwaFi93FT',
+    'https://dweb.link/ipfs/QmT7Gn3h1gSgjMgh4QnxY26jytmT7JC3DHp5KbDxAzjLqi',
+    'https://dweb.link/ipfs/QmdE3CSFH75ADXdJqRLuhDR9G9xaekMLSxpKasgifSrExs',
+    'https://dweb.link/ipfs/QmVqSPDQ3PXMfYoZN7RwfnqATXKbroegZBjxe4qYTLhKR3',
   ];
 
   const characterColors = [
@@ -585,3 +585,4 @@ export default function NFTCubeInterface() {
     </div>
   );
 }
+
