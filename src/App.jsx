@@ -156,9 +156,18 @@ export default function NFTCubeInterface() {
     camera.position.z = 5;
     cameraRef.current = camera;
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
     renderer.setSize(mountRef.current.clientWidth, mountRef.current.clientHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     mountRef.current.appendChild(renderer.domElement);
+
+    // Force initial render
+    setTimeout(() => {
+      handleResize();
+      if (renderer && scene && camera) {
+        renderer.render(scene, camera);
+      }
+    }, 100);
 
     const raycaster = new THREE.Raycaster();
     raycasterRef.current = raycaster;
