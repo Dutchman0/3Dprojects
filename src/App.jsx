@@ -193,6 +193,9 @@ export default function NFTCubeInterface() {
     const materials = [];
     const faceLabels = ['Welcome Letter', 'AH Logo', 'Certificate', 'Nameplate', 'Jersey #15'];
     
+    // Match character dress colors: magenta, cyan, yellow, red, green
+    const borderColors = ['#FF00FF', '#00FFFF', '#FFFF00', '#FF0000', '#00FF00'];
+    
     for (let i = 0; i < 5; i++) {
       const canvas = document.createElement('canvas');
       canvas.width = 512;
@@ -206,9 +209,15 @@ export default function NFTCubeInterface() {
       ctx.fillStyle = gradient;
       ctx.fillRect(0, 0, 512, 512);
       
+      // Colored border matching the character dress color
+      ctx.strokeStyle = borderColors[i];
+      ctx.lineWidth = 16;
+      ctx.strokeRect(10, 10, 492, 492);
+      
+      // Inner white border for contrast
       ctx.strokeStyle = '#FFFFFF';
-      ctx.lineWidth = 8;
-      ctx.strokeRect(20, 20, 472, 472);
+      ctx.lineWidth = 4;
+      ctx.strokeRect(26, 26, 460, 460);
       
       ctx.fillStyle = '#FFFFFF';
       ctx.shadowColor = '#000000';
@@ -256,6 +265,16 @@ export default function NFTCubeInterface() {
     gradient6.addColorStop(1, '#000033');
     ctx6.fillStyle = gradient6;
     ctx6.fillRect(0, 0, 512, 512);
+    
+    // Colored border for video face
+    ctx6.strokeStyle = '#0066FF';
+    ctx6.lineWidth = 16;
+    ctx6.strokeRect(10, 10, 492, 492);
+    
+    // Inner white border
+    ctx6.strokeStyle = '#FFFFFF';
+    ctx6.lineWidth = 4;
+    ctx6.strokeRect(26, 26, 460, 460);
     
     ctx6.fillStyle = '#FFFFFF';
     ctx6.beginPath();
@@ -585,4 +604,3 @@ export default function NFTCubeInterface() {
     </div>
   );
 }
-
