@@ -148,11 +148,11 @@ export default function NFTCubeInterface() {
     directionalLight.position.set(5, 5, 5);
     scene.add(directionalLight);
 
-    const pointLight1 = new THREE.PointLight(0x8844ff, 1, 100);
+    const pointLight1 = new THREE.PointLight(0x00d4ff, 1, 100);
     pointLight1.position.set(3, 3, 3);
     scene.add(pointLight1);
     
-    const pointLight2 = new THREE.PointLight(0xff44ff, 0.8, 100);
+    const pointLight2 = new THREE.PointLight(0x00ffff, 0.8, 100);
     pointLight2.position.set(-3, 2, -3);
     scene.add(pointLight2);
     
@@ -335,7 +335,7 @@ export default function NFTCubeInterface() {
     // === NEON BORDER CREATION ===
     const neonBorderGroup = new THREE.Group();
     const neonMaterial = new THREE.MeshBasicMaterial({
-      color: 0x8844ff,
+      color: 0x00d4ff,
       transparent: true,
       opacity: 1
     });
@@ -357,7 +357,7 @@ export default function NFTCubeInterface() {
       // Glow effect
       const glowGeometry = edgeGeometry.clone();
       const glowMaterial = new THREE.MeshBasicMaterial({
-        color: 0x8844ff,
+        color: 0x00d4ff,
         transparent: true,
         opacity: 0.3,
         side: THREE.BackSide
@@ -390,7 +390,7 @@ export default function NFTCubeInterface() {
       // Glow effect
       const glowGeometry = horizontalGeometry.clone();
       const glowMaterial = new THREE.MeshBasicMaterial({
-        color: 0x8844ff,
+        color: 0x00d4ff,
         transparent: true,
         opacity: 0.3,
         side: THREE.BackSide
