@@ -126,9 +126,10 @@ export default function NFTCubeInterface() {
   const cameraRef = useRef(null);
   const raycasterRef = useRef(null);
   const mouseRef = useRef(new THREE.Vector2());
-  const starsRef = useRef(null);
-  const brightStarsRef = useRef(null);
-  const nebulaRef = useRef(null);
+  // Removed refs for stars and nebula as they are no longer used
+  // const starsRef = useRef(null);
+  // const brightStarsRef = useRef(null);
+  // const nebulaRef = useRef(null);
 
   // Handler for navigation arrows
   const handleFaceChange = useCallback((direction) => {
@@ -184,80 +185,9 @@ export default function NFTCubeInterface() {
     scene.add(pointLight2);
     
     // --- Background (Stars & Nebula) ---
-    const addBackground = () => {
-      // Stars
-      const starGeometry = new THREE.BufferGeometry();
-      const starCount = 2000;
-      const starPositions = new Float32Array(starCount * 3);
-      const starColors = new Float32Array(starCount * 3);
-      
-      for (let i = 0; i < starCount * 3; i += 3) {
-        starPositions[i] = (Math.random() - 0.5) * 100;
-        starPositions[i + 1] = (Math.random() - 0.5) * 100;
-        starPositions[i + 2] = (Math.random() - 0.5) * 100;
-        
-        const c = Math.random();
-        starColors[i] = c < 0.7 ? 1 : (c < 0.85 ? 0.8 : 1);
-        starColors[i + 1] = c < 0.7 ? 1 : (c < 0.85 ? 0.9 : 0.95);
-        starColors[i + 2] = c < 0.7 ? 1 : (c < 0.85 ? 1 : 0.8);
-      }
-      starGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
-      starGeometry.setAttribute('color', new THREE.BufferAttribute(starColors, 3));
-      
-      const starMaterial = new THREE.PointsMaterial({ size: 0.1, vertexColors: true, transparent: true, opacity: 0.8 });
-      starsRef.current = new THREE.Points(starGeometry, starMaterial);
-      scene.add(starsRef.current);
-      
-      // Bright Stars
-      const brightStarGeometry = new THREE.BufferGeometry();
-      const brightStarCount = 200;
-      const brightStarPositions = new Float32Array(brightStarCount * 3);
-      for (let i = 0; i < brightStarCount * 3; i += 3) {
-        brightStarPositions[i] = (Math.random() - 0.5) * 100;
-        brightStarPositions[i + 1] = (Math.random() - 0.5) * 100;
-        brightStarPositions[i + 2] = (Math.random() - 0.5) * 100;
-      }
-      brightStarGeometry.setAttribute('position', new THREE.BufferAttribute(brightStarPositions, 3));
-      const brightStarMaterial = new THREE.PointsMaterial({ size: 0.3, color: 0xffffff, transparent: true, opacity: 1 });
-      brightStarsRef.current = new THREE.Points(brightStarGeometry, brightStarMaterial);
-      scene.add(brightStarsRef.current);
-
-      // Nebula (using canvas texture)
-      const nebulaGeometry = new THREE.BufferGeometry();
-      const nebulaCount = 500;
-      const nebulaPositions = new Float32Array(nebulaCount * 3);
-      const nebulaColors = new Float32Array(nebulaCount * 3);
-      for (let i = 0; i < nebulaCount * 3; i += 3) {
-        nebulaPositions[i] = (Math.random() - 0.5) * 60;
-        nebulaPositions[i + 1] = (Math.random() - 0.5) * 60;
-        nebulaPositions[i + 2] = (Math.random() - 0.5) * 60 - 20;
-        nebulaColors[i] = 0.5 + Math.random() * 0.5;
-        nebulaColors[i + 1] = 0.2 + Math.random() * 0.3;
-        nebulaColors[i + 2] = 0.8 + Math.random() * 0.2;
-      }
-      nebulaGeometry.setAttribute('position', new THREE.BufferAttribute(nebulaPositions, 3));
-      nebulaGeometry.setAttribute('color', new THREE.BufferAttribute(nebulaColors, 3));
-      
-      const nebulaCanvas = document.createElement('canvas');
-      nebulaCanvas.width = 64; nebulaCanvas.height = 64;
-      const nebulaCtx = nebulaCanvas.getContext('2d');
-      const gradient = nebulaCtx.createRadialGradient(32, 32, 0, 32, 32, 32);
-      gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
-      gradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.3)');
-      gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
-      nebulaCtx.fillStyle = gradient;
-      nebulaCtx.fillRect(0, 0, 64, 64);
-      const nebulaTexture = new THREE.CanvasTexture(nebulaCanvas);
-      
-      const nebulaMaterial = new THREE.PointsMaterial({
-        size: 2, map: nebulaTexture, vertexColors: true, transparent: true,
-        opacity: 0.15, blending: THREE.AdditiveBlending, depthWrite: false
-      });
-      nebulaRef.current = new THREE.Points(nebulaGeometry, nebulaMaterial);
-      scene.add(nebulaRef.current);
-    };
-
-    addBackground();
+    // Removed the addBackground function and its call
+    // const addBackground = () => { /* ... */ };
+    // addBackground();
 
 
     // --- Cube Setup ---
@@ -430,13 +360,13 @@ export default function NFTCubeInterface() {
       const isZoomed = selectedFace !== null || showVideo;
       const rotationSpeed = 0.05; // Smoothness of rotation
 
-      // Background rotation
-      if (starsRef.current) starsRef.current.rotation.y += 0.0002;
-      if (brightStarsRef.current) brightStarsRef.current.rotation.y += 0.0003;
-      if (nebulaRef.current) {
-        nebulaRef.current.rotation.y += 0.0001;
-        nebulaRef.current.rotation.x += 0.00005;
-      }
+      // Removed background rotation for stars and nebula
+      // if (starsRef.current) starsRef.current.rotation.y += 0.0002;
+      // if (brightStarsRef.current) brightStarsRef.current.rotation.y += 0.0003;
+      // if (nebulaRef.current) {
+      //   nebulaRef.current.rotation.y += 0.0001;
+      //   nebulaRef.current.rotation.x += 0.00005;
+      // }
 
       // --- Cube Rotation and Oscillation ---
       const targetRotation = TARGET_ROTATIONS[currentFaceIndex];
