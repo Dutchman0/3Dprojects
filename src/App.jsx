@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import * as THREE from 'three';
 
 // --- Static Data Definitions (Moved outside component) ---
@@ -19,17 +19,22 @@ const CHARACTER_COLORS = [
   { skin: 0xf4c8a8, hair: 0x0000ff, dress: 0x0066FF }, // Face 5: Blue (Video)
 ];
 
-// All border colors are now set to the specific hex code #CC442A
-const BORDER_COLORS = ['#3C59B1', '#3C59B1', '#3C59B1', '#DC3D29', '#DC3D29', '#DC3D29'];
+// All border colors are set to the requested hex code #CC442A
+const BORDER_COLORS = ['#CC442A', '#CC442A', '#CC442A', '#CC442A', '#CC442A', '#CC442A'];
 
 const FACE_LABELS = ['Welcome Letter', 'AH Logo', 'Certificate', 'Nameplate', 'Jersey #15', 'Highlight Video'];
 
+// Target rotations (Euler XYZ) to center each cube face upright towards the camera
+const TARGET_ROTATIONS = [
+  new THREE.Euler(0, 0, 0),             // 0: Z+ (Front)
+  new THREE.Euler(0, -Math.PI / 2, 0),  // 1: X+ (Right)
+  new THREE.Euler(0, Math.PI, 0),       // 2: Z- (Back)
+  new THREE.Euler(0, Math.PI / 2, 0),   // 3: X- (Left)
+  new THREE.Euler(Math.PI / 2, 0, 0),   // 4: Y+ (Top)
+  new THREE.Euler(-Math.PI / 2, 0, 0)   // 5: Y- (Bottom)
+];
+
 // --- Utility Function: 3D Character Builder (Moved outside component) ---
-/**
- * Creates a simple, stylized 3D character model (humanoid).
- * @param {object} colors - Object containing skin, hair, and dress color hex values.
- * @returns {THREE.Group} The complete character group.
- */
 const createCharacter = (colors) => {
   const character = new THREE.Group();
   
@@ -108,7 +113,10 @@ const createCharacter = (colors) => {
 // --- Main React Component ---
 export default function NFTCubeInterface() {
   const mountRef = useRef(null);
-  const [selectedFace, setSelectedFace] = useState(null);
+  // currentFaceIndex controls which face is centered/targeted for rotation (0-5)
+  const [currentFaceIndex, setCurrentFaceIndex] = useState(0); 
+  // selectedFace controls which character is zoomed in (0-4 or null)
+  const [selectedFace, setSelectedFace] = useState(null); 
   const [showVideo, setShowVideo] = useState(false);
   
   // Three.js object refs
@@ -121,6 +129,17 @@ export default function NFTCubeInterface() {
   const starsRef = useRef(null);
   const brightStarsRef = useRef(null);
   const nebulaRef = useRef(null);
+
+  // Handler for navigation arrows
+  const handleFaceChange = useCallback((direction) => {
+    // If a character or video is currently zoomed in, zoom out first
+    if (selectedFace !== null || showVideo) {
+      setSelectedFace(null);
+      setShowVideo(false);
+    }
+    
+    setCurrentFaceIndex(prevIndex => (prevIndex + direction + 6) % 6);
+  }, [selectedFace, showVideo]);
 
   // Effect for setting up the Three.js scene (Runs once on mount)
   useEffect(() => {
@@ -341,6 +360,9 @@ export default function NFTCubeInterface() {
     scene.add(cube);
     cubeRef.current = cube;
 
+    // Set initial rotation to Face 0 target
+    cube.rotation.copy(TARGET_ROTATIONS[0]);
+
     // Add wireframe border
     const wireframe = new THREE.LineSegments(
       new THREE.EdgesGeometry(cubeGeometry),
@@ -370,6 +392,10 @@ export default function NFTCubeInterface() {
 
       if (intersects.length > 0) {
         const faceIndex = Math.floor(intersects[0].faceIndex / 2);
+        
+        // Update the current face index based on the clicked face
+        setCurrentFaceIndex(faceIndex);
+
         if (faceIndex === 5) {
           setSelectedFace(null);
           setShowVideo(true);
@@ -398,6 +424,11 @@ export default function NFTCubeInterface() {
     let animationId;
     const animate = () => {
       animationId = requestAnimationFrame(animate);
+      const time = Date.now() * 0.0005; // Time variable for sinusoidal animation
+      
+      // Global oscillation factor (used when not zoomed in)
+      const isZoomed = selectedFace !== null || showVideo;
+      const rotationSpeed = 0.05; // Smoothness of rotation
 
       // Background rotation
       if (starsRef.current) starsRef.current.rotation.y += 0.0002;
@@ -407,12 +438,32 @@ export default function NFTCubeInterface() {
         nebulaRef.current.rotation.x += 0.00005;
       }
 
-      // Cube or Character rotation
-      if (selectedFace === null && !showVideo) {
-        // CUBE SPIN (15% + 5% = 20% INCREASED from original 0.001/0.002):
-        cube.rotation.x += 0.0012075; // 0.00115 * 1.05 
-        cube.rotation.y += 0.002415;  // 0.0023 * 1.05
-      } else if (selectedFace !== null) {
+      // --- Cube Rotation and Oscillation ---
+      const targetRotation = TARGET_ROTATIONS[currentFaceIndex];
+
+      // Interpolate to target rotation (SLERP for quaternion for smoother path)
+      const currentQuaternion = new THREE.Quaternion().copy(cube.quaternion);
+      const targetQuaternion = new THREE.Quaternion().setFromEuler(targetRotation);
+      
+      // Apply SLERP only if the cube is not already there (within epsilon)
+      if (!currentQuaternion.equals(targetQuaternion)) {
+          currentQuaternion.slerp(targetQuaternion, rotationSpeed);
+          cube.rotation.setFromQuaternion(currentQuaternion);
+      }
+      
+      // Apply subtle hover only when fully un-zoomed
+      if (!isZoomed && currentFaceIndex === 0) {
+        // Subtle oscillation animation for the default front view (Face 0)
+        cube.position.y = Math.sin(time * 0.5) * 0.1; // Gentle hover on Y-axis
+        cube.rotation.y += Math.sin(time * 0.3) * 0.001; // Tiny oscillating yaw
+        cube.rotation.x += Math.cos(time * 0.2) * 0.0005; // Tiny oscillating pitch
+      } else {
+        cube.position.y = 0; // Keep centered when a face is selected
+      }
+
+
+      // Character rotation when zoomed in
+      if (selectedFace !== null) {
         charactersRef.current[selectedFace].rotation.y += 0.01;
       }
 
@@ -436,9 +487,9 @@ export default function NFTCubeInterface() {
       renderer.dispose();
       mountRef.current?.removeChild(renderer.domElement);
     };
-  }, []); // Empty dependency array ensures it runs only once on mount
+  }, [currentFaceIndex]); // currentFaceIndex dependency ensures transition logic is handled when state changes
 
-  // Effect for handling the transition animation (Runs on state change)
+  // Effect for handling the transition animation (Runs on selectedFace/showVideo state change)
   useEffect(() => {
     if (!cubeRef.current || !charactersRef.current.length || !cameraRef.current) return;
 
@@ -448,6 +499,7 @@ export default function NFTCubeInterface() {
 
     let startTime = Date.now();
     const duration = 1000; // 1 second transition
+    const isZoomed = selectedFace !== null || showVideo;
 
     const animateTransition = () => {
       const elapsed = Date.now() - startTime;
@@ -455,23 +507,24 @@ export default function NFTCubeInterface() {
       const eased = 1 - Math.pow(1 - progress, 3); // Ease-out effect
 
       // Camera Z positions
-      const startZ = selectedFace === null && !showVideo ? 4 : 5;
-      const endZ = selectedFace === null && !showVideo ? 5 : 4;
+      const startZ = isZoomed ? 5 : 4;
+      const endZ = isZoomed ? 4 : 5;
       
       // Camera Y positions (to center on the character at y=-0.5)
-      const startY = selectedFace === null && !showVideo ? -0.5 : 0;
-      const endY = selectedFace === null && !showVideo ? 0 : -0.5;
+      const startY = isZoomed ? 0 : -0.5;
+      const endY = isZoomed ? -0.5 : 0;
 
-      // Update camera position to ensure character is centered (Upright Origin)
+      // Update camera position to ensure character is centered 
       camera.position.z = startZ + (endZ - startZ) * eased;
       camera.position.y = startY + (endY - startY) * eased;
 
-      if (selectedFace !== null || showVideo) {
+      if (isZoomed) {
         // Transition TO character/video view (Cube shrinks, object grows)
-        cube.scale.setScalar(0.01 + (1 - eased) * 0.99);
-        cube.material.forEach(mat => mat.opacity = 0.9 * (1 - eased));
+        cube.scale.setScalar(1 - eased * 0.99); // Shrink cube to 1%
+        cube.material.forEach(mat => mat.opacity = 1 - eased);
         
         if (selectedFace !== null) {
+          // Grow selected character
           characters[selectedFace].scale.setScalar(0.01 + eased * 0.99);
           // Shrink unselected characters
           characters.forEach((char, idx) => {
@@ -485,8 +538,8 @@ export default function NFTCubeInterface() {
         }
       } else {
         // Transition back TO cube view (Cube grows, object shrinks)
-        cube.scale.setScalar(0.01 + eased * 0.99);
-        cube.material.forEach(mat => mat.opacity = 0.9 * eased);
+        cube.scale.setScalar(0.01 + eased * 0.99); // Grow cube back to 100%
+        cube.material.forEach(mat => mat.opacity = eased);
         
         // Shrink characters if returning from a character view
         characters.forEach(char => {
@@ -504,16 +557,15 @@ export default function NFTCubeInterface() {
 
   // Helper function to determine the current border color for the UI panel
   const getCurrentColor = () => {
-    if (selectedFace !== null) {
-      return BORDER_COLORS[selectedFace];
-    }
-    if (showVideo) {
-      return BORDER_COLORS[5]; // Video face color
-    }
-    return 'rgba(204, 68, 42, 0.5)'; // Default cube rotation color, new hex with opacity
+    // Priority: The face currently centered by rotation, unless zoomed in
+    const faceIndex = selectedFace !== null ? selectedFace : (showVideo ? 5 : currentFaceIndex);
+    return BORDER_COLORS[faceIndex];
   };
   
   const currentBorderColor = getCurrentColor();
+  const isZoomed = selectedFace !== null || showVideo;
+  const activeFaceLabel = FACE_LABELS[isZoomed ? (selectedFace !== null ? selectedFace : 5) : currentFaceIndex];
+
 
   return (
     <div className="w-full h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-black relative overflow-hidden font-sans">
@@ -550,24 +602,47 @@ export default function NFTCubeInterface() {
           </div>
         </div>
       )}
+
+      {/* --- Side Change Selection Arrows --- */}
+      {!isZoomed && (
+        <>
+          {/* Left Arrow */}
+          <button 
+            onClick={() => handleFaceChange(-1)}
+            className="absolute left-4 top-1/2 transform -translate-y-1/2 p-3 md:p-4 bg-white/10 hover:bg-white/20 text-white rounded-full transition-colors z-20 shadow-lg backdrop-blur-sm"
+            aria-label="Previous Face"
+          >
+            <svg className="w-6 h-6 md:w-8 md:h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"></path></svg>
+          </button>
+          
+          {/* Right Arrow */}
+          <button 
+            onClick={() => handleFaceChange(1)}
+            className="absolute right-4 top-1/2 transform -translate-y-1/2 p-3 md:p-4 bg-white/10 hover:bg-white/20 text-white rounded-full transition-colors z-20 shadow-lg backdrop-blur-sm"
+            aria-label="Next Face"
+          >
+            <svg className="w-6 h-6 md:w-8 md:h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path></svg>
+          </button>
+        </>
+      )}
       
       {/* Header Title and Instructions */}
       <div className="absolute top-4 left-4 md:top-8 md:left-8 text-white max-w-xs md:max-w-none backdrop-blur-sm bg-black/30 p-4 rounded-xl border border-white/20 shadow-lg">
         <h1 className="text-3xl md:text-5xl font-extrabold mb-1 md:mb-2 bg-clip-text text-transparent bg-gradient-to-r from-pink-400 to-cyan-300 tracking-wider">
           DeVito NFT Viewer
         </h1>
-        <p className="text-sm md:text-base text-gray-200">Click any cube face to zoom in on the exclusive memorabilia.</p>
-        <p className="text-xs md:text-sm text-gray-400 mt-2">Face 6 (The blue face) is a special Highlight Video!</p>
+        <p className="text-sm md:text-base text-gray-200">Use the side arrows or click the cube to explore the assets.</p>
+        <p className="text-xs md:text-sm text-gray-400 mt-2">Currently Viewing: <span className="font-bold" style={{ color: currentBorderColor }}>{activeFaceLabel}</span></p>
       </div>
 
       {/* Return to Cube Button (Visible when zoomed in) */}
-      {(selectedFace !== null || showVideo) && (
+      {isZoomed && (
         <button
           onClick={() => { setSelectedFace(null); setShowVideo(false); }}
           className="absolute bottom-4 left-1/2 transform -translate-x-1/2 px-8 py-3 text-sm md:text-base bg-gradient-to-r from-pink-500 to-cyan-500 text-white font-bold rounded-full hover:scale-105 active:scale-95 transition-all duration-300 shadow-xl z-20"
         >
           <svg className="w-5 h-5 inline mr-2 -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 14l9-5-9-5-9 5 9 5zM12 14l6.16 3.422a12.083 12.083 0 01.665 1.11L12 20.913 5.174 18.02A12.084 12.084 0 014 16.273l6.16-3.422m-7.85-2.235A1.99 1.99 0 016.29 10L12 13.208 17.71 10a1.99 1.99 0 011.66-1.045l-7.234 3.422a12.083 12.083 0 01-.665 1.11L12 20.913 5.174 18.02A12.084 12.084 0 014 16.273l6.16-3.422z"></path></svg>
-          Return to Spinning Cube
+          Return to Cube View
         </button>
       )}
 
@@ -579,7 +654,7 @@ export default function NFTCubeInterface() {
         <h3 className="font-extrabold mb-2 text-lg md:text-xl"
           style={{ color: currentBorderColor }}
         >
-          {selectedFace !== null || showVideo ? FACE_LABELS[selectedFace !== null ? selectedFace : 5] : 'NFT Collection Status'}
+          {activeFaceLabel}
         </h3>
         {showVideo ? (
           <>
@@ -596,14 +671,12 @@ export default function NFTCubeInterface() {
           </>
         ) : (
           <>
+            <p className="text-gray-300">Face: **#{currentFaceIndex + 1}/6**</p>
             <p className="text-gray-300">Total Pieces: **6/6**</p>
-            <p className="text-gray-300">Click to Inspect</p>
-            <p className="text-gray-500 mt-4 text-xs">A Three.js + React showcase of immersive digital assets.</p>
+            <p className="text-gray-300 mt-4 text-xs">A Three.js + React showcase of immersive digital assets.</p>
           </>
         )}
       </div>
     </div>
   );
 }
-
-
