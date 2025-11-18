@@ -19,17 +19,11 @@ const CHARACTER_COLORS = [
   { skin: 0xf4c8a8, hair: 0x0000ff, dress: 0x0066FF }, // Face 5: Blue (Video)
 ];
 
-// All border colors are now set to the specific hex code #CC442A
 const BORDER_COLORS = ['#CC442A', '#CC442A', '#CC442A', '#CC442A', '#CC442A', '#CC442A'];
 
 const FACE_LABELS = ['Welcome Letter', 'AH Logo', 'Certificate', 'Nameplate', 'Jersey #15', 'Highlight Video'];
 
 // --- Utility Function: 3D Character Builder (Moved outside component) ---
-/**
- * Creates a simple, stylized 3D character model (humanoid).
- * @param {object} colors - Object containing skin, hair, and dress color hex values.
- * @returns {THREE.Group} The complete character group.
- */
 const createCharacter = (colors) => {
   const character = new THREE.Group();
   
@@ -114,6 +108,7 @@ export default function NFTCubeInterface() {
   // Three.js object refs
   const videoRef = useRef(null);
   const cubeRef = useRef(null);
+  const neonBorderRef = useRef(null);
   const charactersRef = useRef([]);
   const cameraRef = useRef(null);
   const raycasterRef = useRef(null);
@@ -149,19 +144,16 @@ export default function NFTCubeInterface() {
     // --- Lighting ---
     scene.add(new THREE.AmbientLight(0xffffff, 0.8));
     
-    // Directional Light
     const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
     directionalLight.position.set(5, 5, 5);
     scene.add(directionalLight);
 
-    // Point Light 1
-    const pointLight1 = new THREE.PointLight(0xffffff, 0.6);
-    pointLight1.position.set(-5, 5, 5);
+    const pointLight1 = new THREE.PointLight(0x8844ff, 1, 100);
+    pointLight1.position.set(3, 3, 3);
     scene.add(pointLight1);
     
-    // Point Light 2
-    const pointLight2 = new THREE.PointLight(0xffffff, 0.6);
-    pointLight2.position.set(5, -5, -5);
+    const pointLight2 = new THREE.PointLight(0xff44ff, 0.8, 100);
+    pointLight2.position.set(-3, 2, -3);
     scene.add(pointLight2);
     
     // --- Background (Stars & Nebula) ---
@@ -203,7 +195,7 @@ export default function NFTCubeInterface() {
       brightStarsRef.current = new THREE.Points(brightStarGeometry, brightStarMaterial);
       scene.add(brightStarsRef.current);
 
-      // Nebula (using canvas texture)
+      // Nebula
       const nebulaGeometry = new THREE.BufferGeometry();
       const nebulaCount = 500;
       const nebulaPositions = new Float32Array(nebulaCount * 3);
@@ -240,9 +232,8 @@ export default function NFTCubeInterface() {
 
     addBackground();
 
-
     // --- Cube Setup ---
-    const cubeGeometry = new THREE.BoxGeometry(2, 2, 2);
+    const cubeGeometry = new THREE.BoxGeometry(2.04, 2.04, 2.04);
     const materials = [];
     
     // Function to create texture for a single cube face
@@ -325,7 +316,7 @@ export default function NFTCubeInterface() {
         ctx.fillText('HIGHLIGHTS', 256, 400);
       }
       
-      drawOverlay(); // Draw initial overlay while image loads
+      drawOverlay();
       const texture = new THREE.CanvasTexture(canvas);
       return new THREE.MeshPhongMaterial({ map: texture, transparent: false, opacity: 1 });
     };
@@ -334,24 +325,100 @@ export default function NFTCubeInterface() {
     for (let i = 0; i < 5; i++) {
       materials.push(createFaceMaterial(i, FACE_IMAGES[i]));
     }
-    // Create material for the 6th video face (No image URL passed)
+    // Create material for the 6th video face
     materials.push(createFaceMaterial(5, null)); 
 
     const cube = new THREE.Mesh(cubeGeometry, materials);
     scene.add(cube);
     cubeRef.current = cube;
 
-    // Add wireframe border
-    const wireframe = new THREE.LineSegments(
-      new THREE.EdgesGeometry(cubeGeometry),
-      new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 2 })
-    );
-    cube.add(wireframe);
+    // === NEON BORDER CREATION ===
+    const neonBorderGroup = new THREE.Group();
+    const neonMaterial = new THREE.MeshBasicMaterial({
+      color: 0x8844ff,
+      transparent: true,
+      opacity: 1
+    });
+
+    const edgeGeometry = new THREE.CylinderGeometry(0.03, 0.03, 2, 8);
+    const edges = [];
+
+    // Vertical edges
+    const verticalPositions = [
+      [1, 0, 1], [1, 0, -1], [-1, 0, 1], [-1, 0, -1]
+    ];
+    
+    verticalPositions.forEach(pos => {
+      const edge = new THREE.Mesh(edgeGeometry, neonMaterial.clone());
+      edge.position.set(pos[0], pos[1], pos[2]);
+      edges.push(edge);
+      neonBorderGroup.add(edge);
+      
+      // Glow effect
+      const glowGeometry = edgeGeometry.clone();
+      const glowMaterial = new THREE.MeshBasicMaterial({
+        color: 0x8844ff,
+        transparent: true,
+        opacity: 0.3,
+        side: THREE.BackSide
+      });
+      const glow = new THREE.Mesh(glowGeometry, glowMaterial);
+      glow.scale.multiplyScalar(1.8);
+      edge.add(glow);
+    });
+
+    // Horizontal edges
+    const horizontalGeometry = new THREE.CylinderGeometry(0.03, 0.03, 2, 8);
+    const horizontalPositions = [
+      { pos: [0, 1, 1], rot: [0, 0, Math.PI / 2] },
+      { pos: [0, 1, -1], rot: [0, 0, Math.PI / 2] },
+      { pos: [1, 1, 0], rot: [0, Math.PI / 2, 0] },
+      { pos: [-1, 1, 0], rot: [0, Math.PI / 2, 0] },
+      { pos: [0, -1, 1], rot: [0, 0, Math.PI / 2] },
+      { pos: [0, -1, -1], rot: [0, 0, Math.PI / 2] },
+      { pos: [1, -1, 0], rot: [0, Math.PI / 2, 0] },
+      { pos: [-1, -1, 0], rot: [0, Math.PI / 2, 0] }
+    ];
+
+    horizontalPositions.forEach(item => {
+      const edge = new THREE.Mesh(horizontalGeometry, neonMaterial.clone());
+      edge.position.set(item.pos[0], item.pos[1], item.pos[2]);
+      edge.rotation.set(item.rot[0], item.rot[1], item.rot[2]);
+      edges.push(edge);
+      neonBorderGroup.add(edge);
+      
+      // Glow effect
+      const glowGeometry = horizontalGeometry.clone();
+      const glowMaterial = new THREE.MeshBasicMaterial({
+        color: 0x8844ff,
+        transparent: true,
+        opacity: 0.3,
+        side: THREE.BackSide
+      });
+      const glow = new THREE.Mesh(glowGeometry, glowMaterial);
+      glow.scale.multiplyScalar(1.8);
+      edge.add(glow);
+    });
+
+    // Corner spheres
+    const cornerGeometry = new THREE.SphereGeometry(0.05, 16, 16);
+    const corners = [
+      [1, 1, 1], [1, 1, -1], [1, -1, 1], [1, -1, -1],
+      [-1, 1, 1], [-1, 1, -1], [-1, -1, 1], [-1, -1, -1]
+    ];
+
+    corners.forEach(pos => {
+      const corner = new THREE.Mesh(cornerGeometry, neonMaterial.clone());
+      corner.position.set(pos[0], pos[1], pos[2]);
+      neonBorderGroup.add(corner);
+    });
+
+    scene.add(neonBorderGroup);
+    neonBorderRef.current = { group: neonBorderGroup, edges };
 
     // --- Characters Setup ---
     const characters = CHARACTER_COLORS.slice(0, 5).map(colors => {
       const character = createCharacter(colors);
-      // The character is placed below the center of the cube
       character.scale.set(0.01, 0.01, 0.01);
       character.position.y = -0.5; 
       scene.add(character);
@@ -389,7 +456,6 @@ export default function NFTCubeInterface() {
       renderer.setSize(width, height);
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
       
-      // Responsive camera adjustments
       const isMobile = width < 768;
       camera.position.z = isMobile ? 6 : 5;
     };
@@ -399,96 +465,93 @@ export default function NFTCubeInterface() {
     const animate = () => {
       animationId = requestAnimationFrame(animate);
 
-      // Background rotation
-      if (starsRef.current) starsRef.current.rotation.y += 0.0002;
-      if (brightStarsRef.current) brightStarsRef.current.rotation.y += 0.0003;
-      if (nebulaRef.current) {
-        nebulaRef.current.rotation.y += 0.0001;
-        nebulaRef.current.rotation.x += 0.00005;
+      // Background rotation (only when not zoomed)
+      if (selectedFace === null && !showVideo) {
+        if (starsRef.current) starsRef.current.rotation.y += 0.0002;
+        if (brightStarsRef.current) brightStarsRef.current.rotation.y += 0.0003;
+        if (nebulaRef.current) {
+          nebulaRef.current.rotation.y += 0.0001;
+          nebulaRef.current.rotation.x += 0.00005;
+        }
       }
 
       // Cube or Character rotation
       if (selectedFace === null && !showVideo) {
-        // CUBE SPIN (15% + 5% = 20% INCREASED from original 0.001/0.002):
-        cube.rotation.x += 0.0012075; // 0.00115 * 1.05 
-        cube.rotation.y += 0.002415;  // 0.0023 * 1.05
+        cube.rotation.x += 0.0012075;
+        cube.rotation.y += 0.002415;
+        neonBorderGroup.rotation.copy(cube.rotation);
       } else if (selectedFace !== null) {
         charactersRef.current[selectedFace].rotation.y += 0.01;
+      }
+
+      // Neon pulse effect (only when not zoomed)
+      if (selectedFace === null && !showVideo) {
+        const pulse = Math.sin(Date.now() * 0.003) * 0.3 + 0.7;
+        edges.forEach(edge => {
+          edge.material.opacity = pulse;
+        });
       }
 
       renderer.render(scene, camera);
     };
 
-    // Initial setup calls
     handleResize();
     animate();
 
-    // Event listeners
     mountRef.current.addEventListener('click', handleClick);
     window.addEventListener('resize', handleResize);
     
-    // Cleanup function
     return () => {
       window.removeEventListener('resize', handleResize);
       mountRef.current?.removeEventListener('click', handleClick);
       cancelAnimationFrame(animationId);
-      // Clean up renderer and its canvas element
       renderer.dispose();
       mountRef.current?.removeChild(renderer.domElement);
     };
-  }, []); // Empty dependency array ensures it runs only once on mount
+  }, []);
 
-  // Effect for handling the transition animation (Runs on state change)
+  // Effect for handling the transition animation
   useEffect(() => {
-    if (!cubeRef.current || !charactersRef.current.length || !cameraRef.current) return;
+    if (!cubeRef.current || !charactersRef.current.length || !cameraRef.current || !neonBorderRef.current) return;
 
     const cube = cubeRef.current;
+    const neonBorder = neonBorderRef.current.group;
     const characters = charactersRef.current;
     const camera = cameraRef.current;
 
     let startTime = Date.now();
-    const duration = 1000; // 1 second transition
+    const duration = 1000;
 
     const animateTransition = () => {
       const elapsed = Date.now() - startTime;
       const progress = Math.min(elapsed / duration, 1);
-      const eased = 1 - Math.pow(1 - progress, 3); // Ease-out effect
+      const eased = 1 - Math.pow(1 - progress, 3);
 
-      // Camera Z positions
       const startZ = selectedFace === null && !showVideo ? 4 : 5;
       const endZ = selectedFace === null && !showVideo ? 5 : 4;
-      
-      // Camera Y positions (to center on the character at y=-0.5)
       const startY = selectedFace === null && !showVideo ? -0.5 : 0;
       const endY = selectedFace === null && !showVideo ? 0 : -0.5;
 
-      // Update camera position to ensure character is centered (Upright Origin)
       camera.position.z = startZ + (endZ - startZ) * eased;
       camera.position.y = startY + (endY - startY) * eased;
 
       if (selectedFace !== null || showVideo) {
-        // Transition TO character/video view (Cube shrinks, object grows)
         cube.scale.setScalar(0.01 + (1 - eased) * 0.99);
+        neonBorder.scale.setScalar(0.01 + (1 - eased) * 0.99);
         cube.material.forEach(mat => mat.opacity = 0.9 * (1 - eased));
         
         if (selectedFace !== null) {
           characters[selectedFace].scale.setScalar(0.01 + eased * 0.99);
-          // Shrink unselected characters
           characters.forEach((char, idx) => {
-            if (idx !== selectedFace) {
-              char.scale.setScalar(0.01);
-            }
+            if (idx !== selectedFace) char.scale.setScalar(0.01);
           });
         } else {
-          // Video selected, shrink all characters
           characters.forEach(char => char.scale.setScalar(0.01));
         }
       } else {
-        // Transition back TO cube view (Cube grows, object shrinks)
         cube.scale.setScalar(0.01 + eased * 0.99);
+        neonBorder.scale.setScalar(0.01 + eased * 0.99);
         cube.material.forEach(mat => mat.opacity = 0.9 * eased);
-        
-        // Shrink characters if returning from a character view
         characters.forEach(char => {
           char.scale.setScalar(Math.max(0.01, 1 - eased * 0.99));
         });
@@ -502,15 +565,14 @@ export default function NFTCubeInterface() {
     animateTransition();
   }, [selectedFace, showVideo]);
 
-  // Helper function to determine the current border color for the UI panel
   const getCurrentColor = () => {
     if (selectedFace !== null) {
       return BORDER_COLORS[selectedFace];
     }
     if (showVideo) {
-      return BORDER_COLORS[5]; // Video face color
+      return BORDER_COLORS[5];
     }
-    return 'rgba(204, 68, 42, 0.5)'; // Default cube rotation color, new hex with opacity
+    return 'rgba(204, 68, 42, 0.5)';
   };
   
   const currentBorderColor = getCurrentColor();
@@ -530,7 +592,6 @@ export default function NFTCubeInterface() {
               className={`w-full rounded-lg`} 
               controls
               autoPlay
-              // Placeholder video URL
               src="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
             >
               Your browser does not support the video tag.
@@ -598,7 +659,7 @@ export default function NFTCubeInterface() {
           <>
             <p className="text-gray-300">Total Pieces: **6/6**</p>
             <p className="text-gray-300">Click to Inspect</p>
-            <p className="text-gray-500 mt-4 text-xs">A Three.js + React showcase of immersive digital assets.</p>
+            <p className="text-gray-500 mt-4 text-xs">A Three.js + React showcase with neon borders.</p>
           </>
         )}
       </div>
