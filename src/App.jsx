@@ -20,7 +20,7 @@ const CHARACTER_COLORS = [
 ];
 
 // All border colors are now set to the specific hex code #CC442A
-const BORDER_COLORS = ['#CC442A', '#CC442A', '#CC442A', '#CC442A', '#CC442A', '#CC442A'];
+const BORDER_COLORS = ['#DC3D29', '#DC3D29', '#DC3D29', '#DC3D29', '#DC3D29', '#DC3D29'];
 
 const FACE_LABELS = ['Welcome Letter', 'AH Logo', 'Certificate', 'Nameplate', 'Jersey #15', 'Highlight Video'];
 
@@ -605,3 +605,4 @@ export default function NFTCubeInterface() {
     </div>
   );
 }
+
