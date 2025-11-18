@@ -332,7 +332,7 @@ export default function NFTCubeInterface() {
     scene.add(cube);
     cubeRef.current = cube;
 
-    // === NEON BORDER CREATION ===
+    // === NEON BORDER CREATION - WRAPPING EACH FACE ===
     const neonBorderGroup = new THREE.Group();
     const neonMaterial = new THREE.MeshBasicMaterial({
       color: 0x00d4ff,
@@ -343,74 +343,68 @@ export default function NFTCubeInterface() {
     const edgeGeometry = new THREE.CylinderGeometry(0.03, 0.03, 2, 8);
     const edges = [];
 
-    // Vertical edges
-    const verticalPositions = [
-      [1, 0, 1], [1, 0, -1], [-1, 0, 1], [-1, 0, -1]
-    ];
-    
-    verticalPositions.forEach(pos => {
-      const edge = new THREE.Mesh(edgeGeometry, neonMaterial.clone());
-      edge.position.set(pos[0], pos[1], pos[2]);
-      edges.push(edge);
-      neonBorderGroup.add(edge);
+    // Helper function to create a neon frame for a face
+    const createFaceFrame = (position, rotation) => {
+      const frameGroup = new THREE.Group();
       
-      // Glow effect
-      const glowGeometry = edgeGeometry.clone();
-      const glowMaterial = new THREE.MeshBasicMaterial({
-        color: 0x00d4ff,
-        transparent: true,
-        opacity: 0.3,
-        side: THREE.BackSide
+      // 4 edges forming a square frame
+      const frameEdges = [
+        { pos: [0, 1, 0], rot: [0, 0, Math.PI / 2] },    // Top
+        { pos: [0, -1, 0], rot: [0, 0, Math.PI / 2] },   // Bottom
+        { pos: [-1, 0, 0], rot: [0, 0, 0] },             // Left
+        { pos: [1, 0, 0], rot: [0, 0, 0] }               // Right
+      ];
+
+      frameEdges.forEach(edge => {
+        const edgeMesh = new THREE.Mesh(edgeGeometry, neonMaterial.clone());
+        edgeMesh.position.set(edge.pos[0], edge.pos[1], edge.pos[2]);
+        edgeMesh.rotation.set(edge.rot[0], edge.rot[1], edge.rot[2]);
+        edges.push(edgeMesh);
+        frameGroup.add(edgeMesh);
+        
+        // Glow effect
+        const glowGeometry = edgeGeometry.clone();
+        const glowMaterial = new THREE.MeshBasicMaterial({
+          color: 0x00d4ff,
+          transparent: true,
+          opacity: 0.3,
+          side: THREE.BackSide
+        });
+        const glow = new THREE.Mesh(glowGeometry, glowMaterial);
+        glow.scale.multiplyScalar(1.8);
+        edgeMesh.add(glow);
       });
-      const glow = new THREE.Mesh(glowGeometry, glowMaterial);
-      glow.scale.multiplyScalar(1.8);
-      edge.add(glow);
-    });
 
-    // Horizontal edges
-    const horizontalGeometry = new THREE.CylinderGeometry(0.03, 0.03, 2, 8);
-    const horizontalPositions = [
-      { pos: [0, 1, 1], rot: [0, 0, Math.PI / 2] },
-      { pos: [0, 1, -1], rot: [0, 0, Math.PI / 2] },
-      { pos: [1, 1, 0], rot: [0, Math.PI / 2, 0] },
-      { pos: [-1, 1, 0], rot: [0, Math.PI / 2, 0] },
-      { pos: [0, -1, 1], rot: [0, 0, Math.PI / 2] },
-      { pos: [0, -1, -1], rot: [0, 0, Math.PI / 2] },
-      { pos: [1, -1, 0], rot: [0, Math.PI / 2, 0] },
-      { pos: [-1, -1, 0], rot: [0, Math.PI / 2, 0] }
-    ];
-
-    horizontalPositions.forEach(item => {
-      const edge = new THREE.Mesh(horizontalGeometry, neonMaterial.clone());
-      edge.position.set(item.pos[0], item.pos[1], item.pos[2]);
-      edge.rotation.set(item.rot[0], item.rot[1], item.rot[2]);
-      edges.push(edge);
-      neonBorderGroup.add(edge);
+      // 4 corner spheres
+      const cornerPositions = [
+        [1, 1, 0], [1, -1, 0], [-1, 1, 0], [-1, -1, 0]
+      ];
       
-      // Glow effect
-      const glowGeometry = horizontalGeometry.clone();
-      const glowMaterial = new THREE.MeshBasicMaterial({
-        color: 0x00d4ff,
-        transparent: true,
-        opacity: 0.3,
-        side: THREE.BackSide
+      const cornerGeometry = new THREE.SphereGeometry(0.05, 16, 16);
+      cornerPositions.forEach(pos => {
+        const corner = new THREE.Mesh(cornerGeometry, neonMaterial.clone());
+        corner.position.set(pos[0], pos[1], pos[2]);
+        frameGroup.add(corner);
       });
-      const glow = new THREE.Mesh(glowGeometry, glowMaterial);
-      glow.scale.multiplyScalar(1.8);
-      edge.add(glow);
-    });
 
-    // Corner spheres
-    const cornerGeometry = new THREE.SphereGeometry(0.05, 16, 16);
-    const corners = [
-      [1, 1, 1], [1, 1, -1], [1, -1, 1], [1, -1, -1],
-      [-1, 1, 1], [-1, 1, -1], [-1, -1, 1], [-1, -1, -1]
+      frameGroup.position.copy(position);
+      frameGroup.rotation.set(rotation.x, rotation.y, rotation.z);
+      return frameGroup;
+    };
+
+    // Create frames for all 6 faces
+    const faceFrames = [
+      { pos: new THREE.Vector3(0, 0, 1.02), rot: new THREE.Euler(0, 0, 0) },           // Front
+      { pos: new THREE.Vector3(0, 0, -1.02), rot: new THREE.Euler(0, Math.PI, 0) },    // Back
+      { pos: new THREE.Vector3(1.02, 0, 0), rot: new THREE.Euler(0, Math.PI / 2, 0) }, // Right
+      { pos: new THREE.Vector3(-1.02, 0, 0), rot: new THREE.Euler(0, -Math.PI / 2, 0) }, // Left
+      { pos: new THREE.Vector3(0, 1.02, 0), rot: new THREE.Euler(-Math.PI / 2, 0, 0) }, // Top
+      { pos: new THREE.Vector3(0, -1.02, 0), rot: new THREE.Euler(Math.PI / 2, 0, 0) }  // Bottom
     ];
 
-    corners.forEach(pos => {
-      const corner = new THREE.Mesh(cornerGeometry, neonMaterial.clone());
-      corner.position.set(pos[0], pos[1], pos[2]);
-      neonBorderGroup.add(corner);
+    faceFrames.forEach(face => {
+      const frame = createFaceFrame(face.pos, face.rot);
+      neonBorderGroup.add(frame);
     });
 
     scene.add(neonBorderGroup);
