@@ -1,18 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 
-/**
- * NFTCubeInterface - Fixed & cleaned-up Three.js React component
- *
- * Notes on fixes:
- * - CanvasTexture is created before any img.onload uses it (texture.needsUpdate safe).
- * - Raycast uses intersect.face.materialIndex (accurate box face index 0..5).
- * - All disposable resources are disposed on unmount to avoid memory leaks.
- * - Robust image onerror fallback and texture.needsUpdate called in all branches.
- * - Safer guard checks when accessing characters by index.
- */
-
-/* ---------- Static data (same as original, but can be passed as props) ---------- */
+/* ---------- Static data ---------- */
 const FACE_IMAGES = [
   "https://dweb.link/ipfs/QmVqSPDQ3PXMfYoZN7RwfnqATXKbroegZBjxe4qYTLhKR3",
   "https://dweb.link/ipfs/QmQXMB45tfidy3YqZ9hi7A69HrgjU3jYrM5WJwwaFi93FT",
@@ -61,7 +50,10 @@ const createCharacter = (colors) => {
   head.position.y = 1.5;
   g.add(head);
 
-  const hair = new THREE.Mesh(new THREE.SphereGeometry(0.34, 16, 16, 0, Math.PI * 2, 0, Math.PI * 0.6), hairMat);
+  const hair = new THREE.Mesh(
+    new THREE.SphereGeometry(0.34, 16, 16, 0, Math.PI * 2, 0, Math.PI * 0.6),
+    hairMat
+  );
   hair.position.y = 1.65;
   g.add(hair);
 
@@ -114,7 +106,6 @@ const createCharacter = (colors) => {
 export default function NFTCubeInterface() {
   const mountRef = useRef(null);
 
-  const cubeRef = useRef(null);
   const sceneRef = useRef(null);
   const rendererRef = useRef(null);
   const cameraRef = useRef(null);
@@ -127,6 +118,7 @@ export default function NFTCubeInterface() {
   const edgesRef = useRef([]);
   const charactersRef = useRef([]);
   const animationIdRef = useRef(null);
+  const cubeRef = useRef(null);
 
   const [selectedFace, setSelectedFace] = useState(null);
   const [showVideo, setShowVideo] = useState(false);
@@ -135,22 +127,35 @@ export default function NFTCubeInterface() {
   useEffect(() => {
     if (!mountRef.current) return;
 
+    // Ensure mount container has position relative so renderer absolute canvas can align
+    const mountEl = mountRef.current;
+    mountEl.style.position = mountEl.style.position || "relative";
+    mountEl.style.overflow = "hidden";
+
     /* ---------- scene, camera, renderer ---------- */
     const scene = new THREE.Scene();
     sceneRef.current = scene;
 
-    const width = mountRef.current.clientWidth;
-    const height = mountRef.current.clientHeight;
+    const width = mountEl.clientWidth || window.innerWidth;
+    const height = mountEl.clientHeight || window.innerHeight;
 
     const camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
     camera.position.z = 5;
+    camera.position.y = -0.5;
     cameraRef.current = camera;
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
     renderer.setSize(width, height);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    // make canvas fill the container and sit behind overlays
+    renderer.domElement.style.display = "block";
+    renderer.domElement.style.position = "absolute";
+    renderer.domElement.style.top = "0";
+    renderer.domElement.style.left = "0";
+    renderer.domElement.style.width = "100%";
+    renderer.domElement.style.height = "100%";
     rendererRef.current = renderer;
-    mountRef.current.appendChild(renderer.domElement);
+    mountEl.appendChild(renderer.domElement);
 
     const raycaster = new THREE.Raycaster();
     raycasterRef.current = raycaster;
@@ -180,7 +185,6 @@ export default function NFTCubeInterface() {
         pos[idx] = (Math.random() - 0.5) * 100;
         pos[idx + 1] = (Math.random() - 0.5) * 100;
         pos[idx + 2] = (Math.random() - 0.5) * 100;
-        const c = Math.random();
         colors[idx] = colors[idx + 1] = colors[idx + 2] = 0.8 + Math.random() * 0.2;
       }
       const g = new THREE.BufferGeometry();
@@ -321,6 +325,7 @@ export default function NFTCubeInterface() {
           texture.needsUpdate = true;
         };
         img.onerror = () => {
+          // eslint-disable-next-line no-console
           console.warn(`Face image ${index} failed to load. Using fallback.`);
           drawOverlay("#111");
           texture.needsUpdate = true;
@@ -366,7 +371,12 @@ export default function NFTCubeInterface() {
         frameGroup.add(edgeMesh);
 
         // soft glow copy (back side)
-        const glowMat = new THREE.MeshBasicMaterial({ color: 0x00d4ff, transparent: true, opacity: 0.28, side: THREE.BackSide });
+        const glowMat = new THREE.MeshBasicMaterial({
+          color: 0x00d4ff,
+          transparent: true,
+          opacity: 0.28,
+          side: THREE.BackSide,
+        });
         const glow = new THREE.Mesh(edgeGeo.clone(), glowMat);
         glow.scale.multiplyScalar(1.3);
         edgeMesh.add(glow);
@@ -404,19 +414,21 @@ export default function NFTCubeInterface() {
 
     /* ---------- interaction handlers ---------- */
     const onClick = (ev) => {
-      if (!mountRef.current) return;
-      const rect = mountRef.current.getBoundingClientRect();
+      if (!mountEl) return;
+      const rect = mountEl.getBoundingClientRect();
       mouseRef.current.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
       mouseRef.current.y = -((ev.clientY - rect.top) / rect.height) * 2 + 1;
 
-      raycaster.setFromCamera(mouseRef.current, camera);
-      // intersect with cube (use recursive=false)
-      const intersects = raycaster.intersectObject(cube, false);
+      const rc = raycasterRef.current;
+      const cam = cameraRef.current;
+      if (!rc || !cam || !cubeRef.current) return;
+      rc.setFromCamera(mouseRef.current, cam);
+      const intersects = rc.intersectObject(cubeRef.current, false);
       if (intersects && intersects.length > 0) {
-        // use face.materialIndex rather than faceIndex/2 (robust)
-        const faceIndex = intersects[0].face && typeof intersects[0].face.materialIndex === "number"
-          ? intersects[0].face.materialIndex
-          : Math.floor(intersects[0].faceIndex / 2);
+        const faceIndex =
+          intersects[0].face && typeof intersects[0].face.materialIndex === "number"
+            ? intersects[0].face.materialIndex
+            : Math.floor(intersects[0].faceIndex / 2);
         if (faceIndex === 5) {
           setSelectedFace(null);
           setShowVideo(true);
@@ -427,19 +439,21 @@ export default function NFTCubeInterface() {
       }
     };
 
-    mountRef.current.addEventListener("click", onClick);
+    mountEl.addEventListener("click", onClick);
 
     /* ---------- resize ---------- */
     const onResize = () => {
-      if (!mountRef.current || !camera || !renderer) return;
-      const w = mountRef.current.clientWidth;
-      const h = mountRef.current.clientHeight;
-      camera.aspect = w / h;
-      camera.updateProjectionMatrix();
-      renderer.setSize(w, h);
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-      // small mobile tweak
-      camera.position.z = w < 768 ? 6 : 5;
+      if (!mountEl) return;
+      const w = mountEl.clientWidth;
+      const h = mountEl.clientHeight;
+      const cam = cameraRef.current;
+      const rend = rendererRef.current;
+      if (!cam || !rend) return;
+      cam.aspect = w / h;
+      cam.updateProjectionMatrix();
+      rend.setSize(w, h);
+      rend.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      cam.position.z = w < 768 ? 6 : 5;
     };
     window.addEventListener("resize", onResize);
 
@@ -460,10 +474,13 @@ export default function NFTCubeInterface() {
       }
 
       // cube or character motion
+      const cubeLocal = cubeRef.current;
+      if (!cubeLocal) return;
+
       if (selectedFace === null && !showVideo) {
-        cube.rotation.x += 0.0012 * dt;
-        cube.rotation.y += 0.0024 * dt;
-        neonGroup.rotation.copy(cube.rotation);
+        cubeLocal.rotation.x += 0.0012 * dt;
+        cubeLocal.rotation.y += 0.0024 * dt;
+        if (neonGroupRef.current) neonGroupRef.current.rotation.copy(cubeLocal.rotation);
 
         // pulse neon
         const pulse = Math.sin(now * 0.003) * 0.3 + 0.7;
@@ -472,9 +489,9 @@ export default function NFTCubeInterface() {
         });
 
         // ensure cube visible
-        cube.scale.setScalar(1);
-        neonGroup.scale.setScalar(1);
-        cube.material.forEach((m) => { if (m) m.opacity = 1; });
+        cubeLocal.scale.setScalar(1);
+        if (neonGroupRef.current) neonGroupRef.current.scale.setScalar(1);
+        if (Array.isArray(cubeLocal.material)) cubeLocal.material.forEach((m) => { if (m) m.opacity = 1; });
 
         // characters minimized
         charactersRef.current.forEach((ch) => ch.scale.setScalar(0.01));
@@ -483,19 +500,20 @@ export default function NFTCubeInterface() {
         if (charactersRef.current[selectedFace]) {
           charactersRef.current[selectedFace].rotation.y += 0.01 * dt;
         }
-        // animate camera slightly back
       } else if (showVideo) {
         // video modal active - keep cube minimized
       }
 
-      renderer.render(scene, camera);
+      const rend = rendererRef.current;
+      const cam = cameraRef.current;
+      if (rend && cam) rend.render(scene, cam);
     };
     animate();
 
     /* ---------- cleanup on unmount ---------- */
     return () => {
       // listeners
-      mountRef.current?.removeEventListener("click", onClick);
+      mountEl.removeEventListener("click", onClick);
       window.removeEventListener("resize", onResize);
 
       // cancel animation
@@ -524,19 +542,20 @@ export default function NFTCubeInterface() {
         }
 
         // cube geometry and materials
-        if (cube) {
-          if (cube.geometry) cube.geometry.dispose();
-          if (Array.isArray(cube.material)) {
-            cube.material.forEach((m) => {
+        const cubeToDispose = cubeRef.current;
+        if (cubeToDispose) {
+          if (cubeToDispose.geometry) cubeToDispose.geometry.dispose();
+          if (Array.isArray(cubeToDispose.material)) {
+            cubeToDispose.material.forEach((m) => {
               if (!m) return;
               if (m.map) m.map.dispose();
-              m.dispose();
+              if (m.dispose) m.dispose();
             });
-          } else if (cube.material) {
-            if (cube.material.map) cube.material.map.dispose();
-            cube.material.dispose();
+          } else if (cubeToDispose.material) {
+            if (cubeToDispose.material.map) cubeToDispose.material.map.dispose();
+            if (cubeToDispose.material.dispose) cubeToDispose.material.dispose();
           }
-          scene.remove(cube);
+          scene.remove(cubeToDispose);
         }
 
         // neon edges
@@ -565,14 +584,18 @@ export default function NFTCubeInterface() {
         });
 
         // dispose renderer
-        renderer.dispose();
-        // remove DOM
-        mountRef.current?.removeChild(renderer.domElement);
+        if (rendererRef.current) {
+          rendererRef.current.dispose();
+          if (rendererRef.current.domElement && mountEl.contains(rendererRef.current.domElement)) {
+            mountEl.removeChild(rendererRef.current.domElement);
+          }
+        }
       } catch (err) {
         // swallow cleanup errors
         // console.warn("Error during Three.js cleanup:", err);
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // mount only
 
   /* ---------- Animate transitions when selection changes ---------- */
