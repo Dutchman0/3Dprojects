@@ -469,7 +469,7 @@ export default function NFTCubeInterface() {
       if (starsRef.current) starsRef.current.rotation.y += 0.0002 * dt;
       if (brightStarsRef.current) brightStarsRef.current.rotation.y += 0.00035 * dt;
       if (nebulaRef.current) {
-        nebulaRef.current.rotation.y += 0.00012 * dt;
+        nebulaRef.current.rotation.y += 0.000012 * dt;
         nebulaRef.current.rotation.x += 0.00006 * dt;
       }
 
@@ -478,8 +478,8 @@ export default function NFTCubeInterface() {
       if (!cubeLocal) return;
 
       if (selectedFace === null && !showVideo) {
-        cubeLocal.rotation.x += 0.0012 * dt;
-        cubeLocal.rotation.y += 0.0024 * dt;
+        cubeLocal.rotation.x += 0.00012 * dt;
+        cubeLocal.rotation.y += 0.00024 * dt;
         if (neonGroupRef.current) neonGroupRef.current.rotation.copy(cubeLocal.rotation);
 
         // pulse neon
@@ -751,3 +751,4 @@ export default function NFTCubeInterface() {
     </div>
   );
 }
+
