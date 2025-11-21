@@ -7,7 +7,7 @@ const FACE_IMAGES = [
   "https://dweb.link/ipfs/QmQXMB45tfidy3YqZ9hi7A69HrgjU3jYrM5WJwwaFi93FT",
   "https://dweb.link/ipfs/QmT7Gn3h1gSgjMgh4QnxY26jytmT7JC3DHp5KbDxAzjLqi",
   "https://dweb.link/ipfs/QmdE3CSFH75ADXdJqRLuhDR9G9xaekMLSxpKasgifSrExs",
-  "https://dweb.link/ipfs/QmVqSPDQ3PXMfYoZN7RwfnqATXKbroegZBjxe4qYTLhKR3",
+  null,
   null,
 ];
 
@@ -16,8 +16,8 @@ const FACE_LABELS = [
   "AH Logo",
   "Certificate",
   "Nameplate",
-  "Jersey #15",
   "Highlight Video",
+  "Behind The Scenes",
 ];
 
 const BORDER_COLORS = [
@@ -25,8 +25,8 @@ const BORDER_COLORS = [
   "#CC442A",
   "#CC442A",
   "#CC442A",
-  "#CC442A",
   "#0055FF",
+  "#9D00FF",
 ];
 
 const CHARACTER_COLORS = [
@@ -127,7 +127,6 @@ export default function NFTCubeInterface() {
   useEffect(() => {
     if (!mountRef.current) return;
 
-    // Ensure mount container has position relative so renderer absolute canvas can align
     const mountEl = mountRef.current;
     mountEl.style.position = mountEl.style.position || "relative";
     mountEl.style.overflow = "hidden";
@@ -147,7 +146,6 @@ export default function NFTCubeInterface() {
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
     renderer.setSize(width, height);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    // make canvas fill the container and sit behind overlays
     renderer.domElement.style.display = "block";
     renderer.domElement.style.position = "absolute";
     renderer.domElement.style.top = "0";
@@ -176,7 +174,6 @@ export default function NFTCubeInterface() {
 
     /* ---------- Add starfield & nebula ---------- */
     const addBackground = () => {
-      // small stars
       const starCount = 2000;
       const pos = new Float32Array(starCount * 3);
       const colors = new Float32Array(starCount * 3);
@@ -195,7 +192,6 @@ export default function NFTCubeInterface() {
       scene.add(points);
       starsRef.current = points;
 
-      // bright stars
       const brightCount = 250;
       const bpos = new Float32Array(brightCount * 3);
       for (let i = 0; i < brightCount; i++) {
@@ -211,7 +207,6 @@ export default function NFTCubeInterface() {
       scene.add(bpoints);
       brightStarsRef.current = bpoints;
 
-      // simple nebula using canvas texture (soft)
       const nebulaCount = 500;
       const npos = new Float32Array(nebulaCount * 3);
       const ncolors = new Float32Array(nebulaCount * 3);
@@ -261,7 +256,6 @@ export default function NFTCubeInterface() {
     const cubeSize = 2.04;
     const cubeGeometry = new THREE.BoxGeometry(cubeSize, cubeSize, cubeSize);
 
-    // helper - create a canvas-based material safely (texture exists before onload uses it)
     const createFaceMaterial = (index, faceImageURL) => {
       const canvas = document.createElement("canvas");
       canvas.width = 512;
@@ -271,12 +265,10 @@ export default function NFTCubeInterface() {
       const texture = new THREE.CanvasTexture(canvas);
 
       const drawOverlay = (bgFill = null) => {
-        // background
         if (bgFill) {
           ctx.fillStyle = bgFill;
           ctx.fillRect(0, 0, 512, 512);
         } else {
-          // default gradient
           const g = ctx.createLinearGradient(0, 0, 512, 512);
           g.addColorStop(0, BORDER_COLORS[index] || "#222");
           g.addColorStop(1, "#000000");
@@ -284,7 +276,6 @@ export default function NFTCubeInterface() {
           ctx.fillRect(0, 0, 512, 512);
         }
 
-        // border/frame
         ctx.strokeStyle = BORDER_COLORS[index] || "#fff";
         ctx.lineWidth = 16;
         ctx.strokeRect(10, 10, 492, 492);
@@ -292,7 +283,6 @@ export default function NFTCubeInterface() {
         ctx.lineWidth = 4;
         ctx.strokeRect(26, 26, 460, 460);
 
-        // text overlay
         ctx.fillStyle = "#FFFFFF";
         ctx.shadowColor = "#000000";
         ctx.shadowBlur = 8;
@@ -308,7 +298,6 @@ export default function NFTCubeInterface() {
         ctx.shadowBlur = 0;
       };
 
-      // If image present, draw it then overlay; else draw placeholder
       if (faceImageURL) {
         const img = new Image();
         img.crossOrigin = "anonymous";
@@ -317,7 +306,6 @@ export default function NFTCubeInterface() {
             ctx.clearRect(0, 0, 512, 512);
             ctx.drawImage(img, 0, 0, 512, 512);
           } catch (err) {
-            // if cross-origin or draw fails, fallback to gradient
             ctx.clearRect(0, 0, 512, 512);
             drawOverlay("#111");
           }
@@ -325,15 +313,11 @@ export default function NFTCubeInterface() {
           texture.needsUpdate = true;
         };
         img.onerror = () => {
-          // eslint-disable-next-line no-console
-          console.warn(`Face image ${index} failed to load. Using fallback.`);
           drawOverlay("#111");
           texture.needsUpdate = true;
         };
-        // set src after handlers
         img.src = faceImageURL;
       } else {
-        // fallback face (video / special face)
         drawOverlay("#001133");
         texture.needsUpdate = true;
       }
@@ -370,7 +354,6 @@ export default function NFTCubeInterface() {
         edges.push(edgeMesh);
         frameGroup.add(edgeMesh);
 
-        // soft glow copy (back side)
         const glowMat = new THREE.MeshBasicMaterial({
           color: 0x00d4ff,
           transparent: true,
@@ -400,12 +383,11 @@ export default function NFTCubeInterface() {
     });
     scene.add(neonGroup);
 
-    /* ---------- characters (small, simple models) ---------- */
+    /* ---------- characters ---------- */
     const characters = CHARACTER_COLORS.slice(0, 5).map((c, i) => {
       const char = createCharacter(c);
-      char.scale.set(0.01, 0.01, 0.01); // start tiny
+      char.scale.set(0.01, 0.01, 0.01);
       char.position.y = -0.5;
-      // spread them horizontally under cube
       char.position.x = (i - 2) * 0.6;
       scene.add(char);
       return char;
@@ -429,8 +411,8 @@ export default function NFTCubeInterface() {
           intersects[0].face && typeof intersects[0].face.materialIndex === "number"
             ? intersects[0].face.materialIndex
             : Math.floor(intersects[0].faceIndex / 2);
-        if (faceIndex === 5) {
-          setSelectedFace(null);
+        if (faceIndex === 4 || faceIndex === 5) {
+          setSelectedFace(faceIndex);
           setShowVideo(true);
         } else {
           setSelectedFace(faceIndex);
@@ -465,15 +447,13 @@ export default function NFTCubeInterface() {
       const dt = now - last;
       last = now;
 
-      // background motions
-      if (starsRef.current) starsRef.current.rotation.y += 0.0002 * dt;
-      if (brightStarsRef.current) brightStarsRef.current.rotation.y += 0.00035 * dt;
+      if (starsRef.current) starsRef.current.rotation.y += 0.00005 * dt;
+      if (brightStarsRef.current) brightStarsRef.current.rotation.y += 0.00009 * dt;
       if (nebulaRef.current) {
-        nebulaRef.current.rotation.y += 0.000012 * dt;
-        nebulaRef.current.rotation.x += 0.00006 * dt;
+        nebulaRef.current.rotation.y += 0.000003 * dt;
+        nebulaRef.current.rotation.x += 0.000015 * dt;
       }
 
-      // cube or character motion
       const cubeLocal = cubeRef.current;
       if (!cubeLocal) return;
 
@@ -482,26 +462,20 @@ export default function NFTCubeInterface() {
         cubeLocal.rotation.y += 0.00024 * dt;
         if (neonGroupRef.current) neonGroupRef.current.rotation.copy(cubeLocal.rotation);
 
-        // pulse neon
         const pulse = Math.sin(now * 0.003) * 0.3 + 0.7;
         edgesRef.current.forEach((edge) => {
           if (edge.material) edge.material.opacity = pulse;
         });
 
-        // ensure cube visible
         cubeLocal.scale.setScalar(1);
         if (neonGroupRef.current) neonGroupRef.current.scale.setScalar(1);
         if (Array.isArray(cubeLocal.material)) cubeLocal.material.forEach((m) => { if (m) m.opacity = 1; });
 
-        // characters minimized
         charactersRef.current.forEach((ch) => ch.scale.setScalar(0.01));
       } else if (selectedFace !== null) {
-        // spin viewed character
         if (charactersRef.current[selectedFace]) {
           charactersRef.current[selectedFace].rotation.y += 0.01 * dt;
         }
-      } else if (showVideo) {
-        // video modal active - keep cube minimized
       }
 
       const rend = rendererRef.current;
@@ -512,16 +486,12 @@ export default function NFTCubeInterface() {
 
     /* ---------- cleanup on unmount ---------- */
     return () => {
-      // listeners
       mountEl.removeEventListener("click", onClick);
       window.removeEventListener("resize", onResize);
 
-      // cancel animation
       if (animationIdRef.current) cancelAnimationFrame(animationIdRef.current);
 
-      // dispose geometries and materials
       try {
-        // dispose stars
         if (starsRef.current) {
           if (starsRef.current.geometry) starsRef.current.geometry.dispose();
           if (starsRef.current.material) starsRef.current.material.dispose();
@@ -541,7 +511,6 @@ export default function NFTCubeInterface() {
           scene.remove(nebulaRef.current);
         }
 
-        // cube geometry and materials
         const cubeToDispose = cubeRef.current;
         if (cubeToDispose) {
           if (cubeToDispose.geometry) cubeToDispose.geometry.dispose();
@@ -551,21 +520,16 @@ export default function NFTCubeInterface() {
               if (m.map) m.map.dispose();
               if (m.dispose) m.dispose();
             });
-          } else if (cubeToDispose.material) {
-            if (cubeToDispose.material.map) cubeToDispose.material.map.dispose();
-            if (cubeToDispose.material.dispose) cubeToDispose.material.dispose();
           }
           scene.remove(cubeToDispose);
         }
 
-        // neon edges
         edgesRef.current.forEach((edge) => {
           if (edge.geometry) edge.geometry.dispose();
           if (edge.material) edge.material.dispose();
           if (edge.parent) edge.parent.remove(edge);
         });
 
-        // characters (dispose their materials if accessible)
         charactersRef.current.forEach((char) => {
           char.traverse((obj) => {
             if (obj.isMesh) {
@@ -583,7 +547,6 @@ export default function NFTCubeInterface() {
           if (char.parent) char.parent.remove(char);
         });
 
-        // dispose renderer
         if (rendererRef.current) {
           rendererRef.current.dispose();
           if (rendererRef.current.domElement && mountEl.contains(rendererRef.current.domElement)) {
@@ -591,14 +554,11 @@ export default function NFTCubeInterface() {
           }
         }
       } catch (err) {
-        // swallow cleanup errors
-        // console.warn("Error during Three.js cleanup:", err);
+        // cleanup errors suppressed
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // mount only
+  }, []);
 
-  /* ---------- Animate transitions when selection changes ---------- */
   useEffect(() => {
     const cube = cubeRef.current;
     const neonGroup = neonGroupRef.current;
@@ -606,7 +566,6 @@ export default function NFTCubeInterface() {
     const camera = cameraRef.current;
     if (!cube || !camera || !neonGroup) return;
 
-    // animate camera & scaling using a small JS easing loop (no external deps)
     const start = Date.now();
     const duration = 700;
     const fromZ = camera.position.z;
@@ -623,15 +582,12 @@ export default function NFTCubeInterface() {
       camera.position.z = fromZ + (toZ - fromZ) * ease;
       camera.position.y = fromY + (toY - fromY) * ease;
 
-      // cube scale
       const s = startCubeScale + (endCubeScale - startCubeScale) * ease;
       cube.scale.setScalar(s);
       neonGroup.scale.setScalar(s);
 
-      // fade cube face materials a bit when zoomed
       if (Array.isArray(cube.material)) cube.material.forEach((m) => { if (m) m.opacity = 0.9 * (1 - ease) + 0.1; });
 
-      // if selected face, grow that character
       characters.forEach((ch, idx) => {
         if (selectedFace !== null && idx === selectedFace) {
           const cs = 0.01 + ease * 0.99;
@@ -648,7 +604,7 @@ export default function NFTCubeInterface() {
     return () => { if (raf) cancelAnimationFrame(raf); };
   }, [selectedFace, showVideo]);
 
-  const currentBorderColor = selectedFace !== null ? BORDER_COLORS[selectedFace] : showVideo ? BORDER_COLORS[5] : "rgba(204,68,42,0.5)";
+      const currentBorderColor = selectedFace !== null ? BORDER_COLORS[selectedFace] : "rgba(204,68,42,0.5)";
 
   return (
     <div className="w-full h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-black relative overflow-hidden font-sans">
@@ -692,12 +648,29 @@ export default function NFTCubeInterface() {
         </div>
       )}
 
-      <div className="absolute top-4 left-4 md:top-8 md:left-8 text-white max-w-xs md:max-w-none backdrop-blur-sm bg-black/30 p-4 rounded-xl border border-white/20 shadow-lg">
+      <div className="absolute top-4 left-4 md:top-8 md:left-8 text-white max-w-xs md:max-w-md backdrop-blur-sm bg-black/30 p-4 rounded-xl border border-white/20 shadow-lg">
         <h1 className="text-3xl md:text-5xl font-extrabold mb-1 md:mb-2 bg-clip-text text-transparent bg-gradient-to-r from-pink-400 to-cyan-300 tracking-wider">
           DeVito NFT Viewer
         </h1>
         <p className="text-sm md:text-base text-gray-200">Click any cube face to zoom in on the exclusive memorabilia.</p>
-        <p className="text-xs md:text-sm text-gray-400 mt-2">Face 6 (The blue face) is a special Highlight Video!</p>
+        <p className="text-xs md:text-sm text-gray-400 mt-2">Faces 5 & 6 (blue & purple) are special videos!</p>
+        
+        <div className="mt-4 pt-4 border-t border-white/20">
+          <h2 className="text-sm font-bold mb-2 text-cyan-300">Cube Faces:</h2>
+          <div className="space-y-1 text-xs md:text-sm">
+            {FACE_LABELS.map((label, idx) => (
+              <div key={idx} className="flex items-center gap-2">
+                <div 
+                  className="w-3 h-3 rounded-full flex-shrink-0" 
+                  style={{ backgroundColor: BORDER_COLORS[idx] }}
+                />
+                <span className="text-gray-300">
+                  <strong>Face {idx + 1}:</strong> {label}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
 
       {(selectedFace !== null || showVideo) && (
@@ -724,14 +697,14 @@ export default function NFTCubeInterface() {
         style={{ borderColor: currentBorderColor, boxShadow: `0 0 15px ${currentBorderColor}` }}
       >
         <h3 className="font-extrabold mb-2 text-lg md:text-xl" style={{ color: currentBorderColor }}>
-          {selectedFace !== null || showVideo ? FACE_LABELS[selectedFace !== null ? selectedFace : 5] : "NFT Collection Status"}
+          {showVideo ? FACE_LABELS[selectedFace] : selectedFace !== null ? FACE_LABELS[selectedFace] : "NFT Collection Status"}
         </h3>
 
         {showVideo ? (
           <>
             <p className="text-gray-300">Type: <strong>Interactive Video</strong></p>
-            <p className="text-gray-300">Face: <strong>#6 (Back)</strong></p>
-            <p className="text-gray-300">Event: <strong>Gameday Highlights</strong></p>
+            <p className="text-gray-300">Face: <strong>#{selectedFace + 1}</strong></p>
+            <p className="text-gray-300">Content: <strong>{selectedFace === 4 ? "Gameday Highlights" : "Behind The Scenes"}</strong></p>
           </>
         ) : selectedFace !== null ? (
           <>
@@ -751,4 +724,3 @@ export default function NFTCubeInterface() {
     </div>
   );
 }
-
