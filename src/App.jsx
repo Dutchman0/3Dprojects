@@ -122,6 +122,7 @@ export default function NFTCubeInterface() {
 
   const [selectedFace, setSelectedFace] = useState(null);
   const [showVideo, setShowVideo] = useState(false);
+  const [showImage, setShowImage] = useState(false);
   const videoRef = useRef(null);
 
   useEffect(() => {
@@ -414,9 +415,11 @@ export default function NFTCubeInterface() {
         if (faceIndex === 4 || faceIndex === 5) {
           setSelectedFace(faceIndex);
           setShowVideo(true);
+          setShowImage(false);
         } else {
           setSelectedFace(faceIndex);
           setShowVideo(false);
+          setShowImage(true);
         }
       }
     };
@@ -457,7 +460,7 @@ export default function NFTCubeInterface() {
       const cubeLocal = cubeRef.current;
       if (!cubeLocal) return;
 
-      if (selectedFace === null && !showVideo) {
+      if (selectedFace === null && !showVideo && !showImage) {
         cubeLocal.rotation.x += 0.00012 * dt;
         cubeLocal.rotation.y += 0.00024 * dt;
         if (neonGroupRef.current) neonGroupRef.current.rotation.copy(cubeLocal.rotation);
@@ -569,11 +572,11 @@ export default function NFTCubeInterface() {
     const start = Date.now();
     const duration = 700;
     const fromZ = camera.position.z;
-    const toZ = selectedFace === null && !showVideo ? 5 : 4.0;
+    const toZ = selectedFace === null && !showVideo && !showImage ? 5 : 4.0;
     const fromY = camera.position.y;
-    const toY = selectedFace === null && !showVideo ? -0.5 : 0;
+    const toY = selectedFace === null && !showVideo && !showImage ? -0.5 : 0;
     const startCubeScale = cube.scale.x;
-    const endCubeScale = selectedFace === null && !showVideo ? 1 : 0.01;
+    const endCubeScale = selectedFace === null && !showVideo && !showImage ? 1 : 0.01;
 
     let raf = null;
     const tick = () => {
@@ -602,13 +605,44 @@ export default function NFTCubeInterface() {
     raf = requestAnimationFrame(tick);
 
     return () => { if (raf) cancelAnimationFrame(raf); };
-  }, [selectedFace, showVideo]);
+  }, [selectedFace, showVideo, showImage]);
 
       const currentBorderColor = selectedFace !== null ? BORDER_COLORS[selectedFace] : "rgba(204,68,42,0.5)";
 
   return (
     <div className="w-full h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-black relative overflow-hidden font-sans">
       <div ref={mountRef} className="w-full h-full" />
+
+      {showImage && selectedFace !== null && FACE_IMAGES[selectedFace] && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-90 z-30 p-4">
+          <div
+            className="relative w-full max-w-5xl rounded-xl p-2"
+            style={{
+              boxShadow: `0 0 40px 10px ${currentBorderColor}`,
+              borderColor: currentBorderColor,
+              borderStyle: "solid",
+              borderWidth: "4px",
+            }}
+          >
+            <img
+              src={FACE_IMAGES[selectedFace]}
+              alt={FACE_LABELS[selectedFace]}
+              className="w-full h-auto rounded-lg max-h-[85vh] object-contain"
+              crossOrigin="anonymous"
+            />
+
+            <button
+              onClick={() => {
+                setShowImage(false);
+                setSelectedFace(null);
+              }}
+              className="absolute -top-4 -right-4 w-10 h-10 md:w-12 md:h-12 bg-red-500 text-white rounded-full hover:bg-red-600 transition-transform hover:scale-105 shadow-xl flex items-center justify-center text-2xl font-bold"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
 
       {showVideo && (
         <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-80 z-30 p-4">
@@ -673,11 +707,12 @@ export default function NFTCubeInterface() {
         </div>
       </div>
 
-      {(selectedFace !== null || showVideo) && (
+      {(selectedFace !== null || showVideo || showImage) && (
         <button
           onClick={() => {
             setSelectedFace(null);
             setShowVideo(false);
+            setShowImage(false);
             if (videoRef.current) {
               videoRef.current.pause();
               videoRef.current.currentTime = 0;
@@ -705,6 +740,13 @@ export default function NFTCubeInterface() {
             <p className="text-gray-300">Type: <strong>Interactive Video</strong></p>
             <p className="text-gray-300">Face: <strong>#{selectedFace + 1}</strong></p>
             <p className="text-gray-300">Content: <strong>{selectedFace === 4 ? "Gameday Highlights" : "Behind The Scenes"}</strong></p>
+          </>
+        ) : showImage ? (
+          <>
+            <p className="text-gray-300">Type: <strong>NFT Image</strong></p>
+            <p className="text-gray-300">Edition: <strong>#{selectedFace + 1}/6</strong></p>
+            <p className="text-gray-300">Rarity: <strong>Legendary</strong></p>
+            <p className="text-gray-300 mt-2">Viewing: <strong style={{ color: BORDER_COLORS[selectedFace] }}>{FACE_LABELS[selectedFace]}</strong></p>
           </>
         ) : selectedFace !== null ? (
           <>
