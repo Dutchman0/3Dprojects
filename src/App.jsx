@@ -7,7 +7,7 @@ import * as THREE from "three";
 
 /* ---------- Static data ---------- */
 const FACE_IMAGES = [
-  "https://dweb.link/ipfs/QmQntziSJHMeEqqFbT1XMyDUYAtqAt8ii1SJVQRmtPFZuZ",
+  "https://dweb.link/ipfs/QmabyjpYL5YFgQPkey4JX9V2x9L8WbbMK7YKPKyx5ftEfH",
   "https://dweb.link/ipfs/QmQXMB45tfidy3YqZ9hi7A69HrgjU3jYrM5WJwwaFi93FT",
   "https://dweb.link/ipfs/QmT7Gn3h1gSgjMgh4QnxY26jytmT7JC3DHp5KbDxAzjLqi",
   "https://dweb.link/ipfs/QmdE3CSFH75ADXdJqRLuhDR9G9xaekMLSxpKasgifSrExs",
@@ -1098,3 +1098,4 @@ export default function NFTCubeInterface() {
 function stageScene(scene) {
   return scene;
 }
+
