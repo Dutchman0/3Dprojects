@@ -381,7 +381,10 @@ export default function NFTCubeInterface() {
     faceFrames.forEach((f) => {
       neonGroup.add(createFaceFrame(f.pos, f.rot));
     });
-    scene.add(neonGroup);
+    // Parent neon frames to the cube so they rotate/flip with it:
+    cube.add(neonGroup);
+
+    scene.add(neonGroup); // keep in scene graph (cube is attached to scene), but neonGroup is a child of cube
 
     /* ---------- characters ---------- */
     const characters = CHARACTER_COLORS.slice(0, 5).map((c, i) => {
@@ -567,7 +570,7 @@ export default function NFTCubeInterface() {
 
       const rend = rendererRef.current;
       const cam = cameraRef.current;
-      if (rend && cam) rend.render(scene, cam);
+      if (rend && cam) rend.render(stageScene(scene), cam);
     };
     animate();
 
@@ -951,7 +954,7 @@ export default function NFTCubeInterface() {
           <svg className="w-5 h-5 inline mr-2 -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 14l9-5-9-5-9 5 9 5z"></path>
           </svg>
-          Return to Spinning Cube
+          Return to Flip-Through
         </button>
       )}
 
@@ -993,4 +996,9 @@ export default function NFTCubeInterface() {
       </div>
     </div>
   );
+}
+
+// small helper used during render to allow any stage-wide transforms later (kept for flexibility)
+function stageScene(scene) {
+  return scene;
 }
