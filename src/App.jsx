@@ -238,9 +238,10 @@ export default function NFTCubeInterface() {
     tex.center = new THREE.Vector2(0.5, 0.5);
     tex.rotation = baseRotation + userRad;
 
-    // baseline repeat.x = -1 from original code; apply user's flips on top
-    const baselineRepeatX = -1;
-    const repeatX = baselineRepeatX * (orient.flipX ? -1 : 1);
+    // IMPORTANT CHANGE:
+    // Remove the prior "baseline mirror" multiplication. Treat flipX as an absolute mirror toggle:
+    // repeatX = orient.flipX ? -1 : 1
+    const repeatX = orient.flipX ? -1 : 1;
     const repeatY = orient.flipY ? -1 : 1;
     tex.wrapS = THREE.RepeatWrapping;
     tex.wrapT = THREE.RepeatWrapping;
@@ -405,7 +406,9 @@ export default function NFTCubeInterface() {
       placeholderTexture.flipY = false;
       placeholderTexture.wrapS = THREE.RepeatWrapping;
       placeholderTexture.wrapT = THREE.RepeatWrapping;
-      placeholderTexture.repeat.set(-1, 1); // baseline mirror
+      // IMPORTANT CHANGE:
+      // Remove the baseline horizontal mirror here. We treat flipX as an explicit user option.
+      placeholderTexture.repeat.set(1, 1);
       placeholderTexture.center = new THREE.Vector2(0.5, 0.5);
       placeholderTexture.rotation = -getTextureRotationForFace(i);
 
@@ -495,7 +498,8 @@ export default function NFTCubeInterface() {
           tex.flipY = false;
           tex.wrapS = THREE.RepeatWrapping;
           tex.wrapT = THREE.RepeatWrapping;
-          tex.repeat.set(-1, 1);
+          // IMPORTANT CHANGE: do not set baseline mirror here — use orient.flipX to mirror explicitly
+          tex.repeat.set(1, 1);
           tex.center = new THREE.Vector2(0.5, 0.5);
           tex.rotation = -getTextureRotationForFace(index);
           applyOrientationToTexture(index, tex);
@@ -518,7 +522,7 @@ export default function NFTCubeInterface() {
         tex.flipY = false;
         tex.wrapS = THREE.RepeatWrapping;
         tex.wrapT = THREE.RepeatWrapping;
-        tex.repeat.set(-1, 1);
+        tex.repeat.set(1, 1);
         tex.center = new THREE.Vector2(0.5, 0.5);
         tex.rotation = -getTextureRotationForFace(index);
         applyOrientationToTexture(index, tex);
@@ -535,7 +539,7 @@ export default function NFTCubeInterface() {
           tex.flipY = false;
           tex.wrapS = THREE.RepeatWrapping;
           tex.wrapT = THREE.RepeatWrapping;
-          tex.repeat.set(-1, 1);
+          tex.repeat.set(1, 1);
           tex.center = new THREE.Vector2(0.5, 0.5);
           tex.rotation = -getTextureRotationForFace(index);
           applyOrientationToTexture(index, tex);
@@ -1107,4 +1111,3 @@ export default function NFTCubeInterface() {
 function stageScene(scene) {
   return scene;
 }
-
