@@ -317,6 +317,9 @@ export default function NFTCubeInterface() {
       const placeholderTexture = new THREE.CanvasTexture(placeholderCanvas);
       placeholderTexture.encoding = THREE.sRGBEncoding;
 
+      // IMPORTANT: prevent vertical flip so rotation/center work consistently
+      placeholderTexture.flipY = false;
+
       // Set center + rotation so the canvas texture appears upright on each face
       placeholderTexture.center = new THREE.Vector2(0.5, 0.5);
       placeholderTexture.rotation = getTextureRotationForFace(i);
@@ -405,6 +408,9 @@ export default function NFTCubeInterface() {
           const tex = new THREE.CanvasTexture(canvas);
           tex.encoding = THREE.sRGBEncoding;
 
+          // IMPORTANT: prevent vertical flip so rotation/center work consistently
+          tex.flipY = false;
+
           tex.center = new THREE.Vector2(0.5, 0.5);
           tex.rotation = getTextureRotationForFace(index);
 
@@ -434,6 +440,9 @@ export default function NFTCubeInterface() {
         const tex = new THREE.CanvasTexture(canvas);
         tex.encoding = THREE.sRGBEncoding;
 
+        // IMPORTANT: prevent vertical flip so rotation/center work consistently
+        tex.flipY = false;
+
         tex.center = new THREE.Vector2(0.5, 0.5);
         tex.rotation = getTextureRotationForFace(index);
 
@@ -450,6 +459,9 @@ export default function NFTCubeInterface() {
           const canvas = drawFaceCanvas({ index, faceImageBitmap: null, width: 1024, height: 1024 });
           const tex = new THREE.CanvasTexture(canvas);
           tex.encoding = THREE.sRGBEncoding;
+
+          // IMPORTANT: prevent vertical flip so rotation/center work consistently
+          tex.flipY = false;
 
           tex.center = new THREE.Vector2(0.5, 0.5);
           tex.rotation = getTextureRotationForFace(index);
