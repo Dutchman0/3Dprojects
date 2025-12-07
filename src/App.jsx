@@ -513,25 +513,82 @@ export default function NFTCubeInterface() {
       if (!cubeLocal) return;
 
       if (selectedFace === null && !showVideo && !showImage) {
-        cubeLocal.rotation.x += 0.00012 * dt;
-        cubeLocal.rotation.y += 0.00024 * dt;
-        if (neonGroupRef.current) neonGroupRef.current.rotation.copy(cubeLocal.rotation);
+  // ---------- pause handling ----------
+  if (pauseTimerRef.current > 0) {
+    pauseTimerRef.current -= dt;
+    return;
+  }
 
-        const pulse = Math.sin(now * 0.003) * 0.3 + 0.7;
-        edgesRef.current.forEach((edge) => {
-          if (edge.material) edge.material.opacity = pulse;
-        });
+  const stepAngle = Math.PI / 2;
 
-        cubeLocal.scale.setScalar(1);
-        if (neonGroupRef.current) neonGroupRef.current.scale.setScalar(1);
-        if (Array.isArray(cubeLocal.material)) cubeLocal.material.forEach((m) => { if (m) m.opacity = 1; });
+  if (flipPhaseRef.current === 0) {
+    // ----- Phase 0: step through side faces -----
+    const target = flipStepRef.current * stepAngle;
+    const diff = target - cubeLocal.rotation.y;
 
-        charactersRef.current.forEach((ch) => ch.scale.setScalar(0.01));
-      } else if (selectedFace !== null) {
-        if (charactersRef.current[selectedFace]) {
-          charactersRef.current[selectedFace].rotation.y += 0.01 * dt;
-        }
+    if (Math.abs(diff) > 0.01) {
+      cubeLocal.rotation.y += Math.sign(diff) * FLIP_SPEED;
+    } else {
+      cubeLocal.rotation.y = target;
+      flipStepRef.current++;
+
+      if (flipStepRef.current > 3) {
+        flipStepRef.current = 0;
+        flipPhaseRef.current = 1; // move to video phase
       }
+
+      pauseTimerRef.current = PAUSE_TIME;
+    }
+  }
+
+  if (flipPhaseRef.current === 1) {
+    // ----- Phase 1: flip to top/bottom -----
+    const target = Math.PI;
+    const diff = target - cubeLocal.rotation.x;
+
+    if (Math.abs(diff) > 0.01) {
+      cubeLocal.rotation.x += Math.sign(diff) * FLIP_SPEED;
+    } else {
+      cubeLocal.rotation.x = target;
+      flipPhaseRef.current = 2;
+      pauseTimerRef.current = PAUSE_TIME;
+    }
+  }
+
+  if (flipPhaseRef.current === 2) {
+    // ----- Phase 2: reverse side faces -----
+    const target = flipStepRef.current * stepAngle;
+    const diff = target - cubeLocal.rotation.y;
+
+    if (Math.abs(diff) > 0.01) {
+      cubeLocal.rotation.y += Math.sign(diff) * FLIP_SPEED;
+    } else {
+      cubeLocal.rotation.y = target;
+
+      flipStepRef.current--;
+
+      if (flipStepRef.current < 0) {
+        flipStepRef.current = 0;
+        flipPhaseRef.current = 0;
+      }
+
+      pauseTimerRef.current = PAUSE_TIME;
+    }
+  }
+
+  // ---------- keep neon synced ----------
+  if (neonGroupRef.current) {
+    neonGroupRef.current.rotation.copy(cubeLocal.rotation);
+  }
+
+  // ---------- camera sync ----------
+  if (cameraRef.current) {
+    cameraRef.current.position.x = Math.sin(cubeLocal.rotation.y) * 1.2;
+    cameraRef.current.position.z = 5 + Math.cos(cubeLocal.rotation.y) * 0.3;
+    cameraRef.current.lookAt(0, 0, 0);
+  }
+}
+
 
       const rend = rendererRef.current;
       const cam = cameraRef.current;
@@ -837,3 +894,4 @@ export default function NFTCubeInterface() {
     </div>
   );
 }
+
