@@ -158,15 +158,13 @@ function drawFaceCanvas({ index, faceImageBitmap = null, width = 1024, height = 
    appear upright on every face. The BoxGeometry material index
    order is: +X, -X, +Y, -Y, +Z, -Z (0..5). */
 function getTextureRotationForFace(index) {
-  // These values were chosen to make overlay text upright for each face.
-  // Tweak if you see a face still rotated—small adjustments are fine.
   switch (index) {
     case 0: // +X
       return Math.PI / 2;
     case 1: // -X
       return -Math.PI / 2;
     case 2: // +Y (top)
-      return Math.PI; // flip so top text reads upright
+      return Math.PI;
     case 3: // -Y (bottom)
       return 0;
     case 4: // +Z (front)
@@ -218,7 +216,6 @@ export default function NFTCubeInterface() {
 
     /* ---------- scene, camera, renderer ---------- */
     const scene = new THREE.Scene();
-    // debug background — safe to remove later
     scene.background = new THREE.Color(0x0b0b14);
     sceneRef.current = scene;
 
@@ -250,7 +247,6 @@ export default function NFTCubeInterface() {
     const onContextLost = (e) => {
       e.preventDefault();
       console.warn("WebGL context lost");
-      // stop animation
       if (animationIdRef.current) cancelAnimationFrame(animationIdRef.current);
     };
     renderer.domElement.addEventListener("webglcontextlost", onContextLost, false);
@@ -317,7 +313,6 @@ export default function NFTCubeInterface() {
 
     // create placeholder materials (we'll update their maps later)
     const placeholderMaterials = FACE_IMAGES.map((_, i) => {
-      // immediate CanvasTexture placeholder with overlay text
       const placeholderCanvas = drawFaceCanvas({ index: i, faceImageBitmap: null, width: 1024, height: 1024 });
       const placeholderTexture = new THREE.CanvasTexture(placeholderCanvas);
       placeholderTexture.encoding = THREE.sRGBEncoding;
@@ -400,10 +395,8 @@ export default function NFTCubeInterface() {
     charactersRef.current = characters;
 
     /* ---------- robust face texture loader ---------- */
-    // Try fetch -> createImageBitmap (CORS friendly) with timeout. If it fails, fall back to overlay.
     const loadFaceTexture = async (index, url, material) => {
       try {
-        // if null, just draw overlay
         if (!url) {
           const canvas = drawFaceCanvas({ index, faceImageBitmap: null, width: 1024, height: 1024 });
           const tex = new THREE.CanvasTexture(canvas);
@@ -418,7 +411,6 @@ export default function NFTCubeInterface() {
           return;
         }
 
-        // Abortable fetch with timeout
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 6000);
 
@@ -427,13 +419,11 @@ export default function NFTCubeInterface() {
 
         if (!resp.ok) throw new Error("Fetch failed");
 
-        // create ImageBitmap - more robust for drawing into canvas
         const blob = await resp.blob();
         let bitmap = null;
         try {
           bitmap = await createImageBitmap(blob);
         } catch (err) {
-          // fallback: create an Image object if createImageBitmap isn't supported
           bitmap = null;
         }
 
@@ -441,11 +431,9 @@ export default function NFTCubeInterface() {
         const tex = new THREE.CanvasTexture(canvas);
         tex.encoding = THREE.sRGBEncoding;
 
-        // ensure correct center/rotation for upright text
         tex.center = new THREE.Vector2(0.5, 0.5);
         tex.rotation = getTextureRotationForFace(index);
 
-        // dispose previous
         if (material.map) {
           try {
             if (material.map.dispose) material.map.dispose();
@@ -455,7 +443,6 @@ export default function NFTCubeInterface() {
         material.map = tex;
         material.needsUpdate = true;
       } catch (err) {
-        // Any error -> fallback overlay
         try {
           const canvas = drawFaceCanvas({ index, faceImageBitmap: null, width: 1024, height: 1024 });
           const tex = new THREE.CanvasTexture(canvas);
@@ -479,10 +466,9 @@ export default function NFTCubeInterface() {
 
     // Kick off async loading for each face (non-blocking)
     placeholderMaterials.forEach((mat, idx) => {
-      // schedule async without awaiting to avoid blocking render
       setTimeout(() => {
         loadFaceTexture(idx, FACE_IMAGES[idx], mat);
-      }, idx * 150); // small stagger to avoid concurrent spikes
+      }, idx * 150);
     });
 
     /* ---------- interaction handlers ---------- */
@@ -519,7 +505,7 @@ export default function NFTCubeInterface() {
 
     mountEl.addEventListener("click", onClick);
 
-    /* ---------- resize observer (more reliable than window resize) ---------- */
+    /* ---------- resize observer ---------- */
     const onResize = () => {
       if (!mountEl) return;
       const w = Math.max(1, mountEl.clientWidth);
@@ -739,16 +725,28 @@ export default function NFTCubeInterface() {
 
   const currentBorderColor = selectedFace !== null ? BORDER_COLORS[selectedFace] : "rgba(204,68,42,0.5)";
 
-  /* ---------- auto flip-through effect ----------
-     Rotates the cube to show each face in sequence. When a video-face (4 or 5)
-     is reached, perform a top-to-bottom flip animation. The autoFlip state can
-     be disabled by clicking the scene (user interaction). */
+  /* ---------- new: phase-based flip-through effect ----------
+     Behavior:
+     - Two phases: "images" (faces that have FACE_IMAGES) and "videos" (faces 4 & 5)
+     - Cycle through all image faces (pause at each), then cycle through all video faces (top-to-bottom flip for each),
+       then repeat image phase, etc.
+     - Clicking the scene disables autoFlip (so user can inspect). Opening an image/video also pauses.
+  */
   useEffect(() => {
-    if (!autoFlip) return;
+    // don't run auto flip while inspector is open
+    if (!autoFlip || showImage || showVideo) return;
     const cube = cubeRef.current;
     if (!cube) return;
 
     let cancelled = false;
+
+    // build face arrays
+    const imageFaces = [];
+    const videoFaces = [];
+    for (let i = 0; i < FACE_IMAGES.length; i++) {
+      if (i === 4 || i === 5) videoFaces.push(i);
+      else if (FACE_IMAGES[i]) imageFaces.push(i);
+    }
 
     const wait = (ms) => new Promise((res) => setTimeout(res, ms));
 
@@ -757,7 +755,7 @@ export default function NFTCubeInterface() {
         const startRot = { x: cube.rotation.x, y: cube.rotation.y };
         const start = performance.now();
         const step = (now) => {
-          if (cancelled) return res();
+          if (cancelled || !autoFlip) return res();
           const t = Math.min(1, (now - start) / dur);
           const ease = 1 - Math.pow(1 - t, 3);
           cube.rotation.x = startRot.x + (target.x - startRot.x) * ease;
@@ -774,7 +772,7 @@ export default function NFTCubeInterface() {
         const startX = cube.rotation.x;
         const start = performance.now();
         const step = (now) => {
-          if (cancelled) return res();
+          if (cancelled || !autoFlip) return res();
           const t = Math.min(1, (now - start) / dur);
           const ease = 1 - Math.pow(1 - t, 3);
           cube.rotation.x = startX + delta * ease;
@@ -785,30 +783,52 @@ export default function NFTCubeInterface() {
       });
     };
 
+    // main async loop
     (async () => {
-      let idx = 0;
-      while (!cancelled) {
-        const target = faceTargetRotations[idx];
-        await animateRotationTo(target, 900);
-
-        // if this is a video face (index 4 or 5 per your logic), do a top-to-bottom flip
-        if (idx === 4 || idx === 5) {
-          // flip down (add PI)
-          await animateDeltaX(Math.PI, 600);
-          await wait(700);
-          // flip back
-          await animateDeltaX(-Math.PI, 600);
+      let phase = "images"; // start with images
+      while (!cancelled && autoFlip) {
+        if (phase === "images") {
+          if (imageFaces.length === 0) {
+            phase = "videos";
+            continue;
+          }
+          // cycle through image faces
+          for (let idx of imageFaces) {
+            if (cancelled || !autoFlip) break;
+            const target = faceTargetRotations[idx];
+            await animateRotationTo(target, 700);
+            // small settle
+            await wait(900);
+            // brief pause while visible
+            await wait(600);
+          }
+          phase = "videos";
+        } else {
+          // videos phase
+          if (videoFaces.length === 0) {
+            phase = "images";
+            continue;
+          }
+          for (let idx of videoFaces) {
+            if (cancelled || !autoFlip) break;
+            const target = faceTargetRotations[idx];
+            await animateRotationTo(target, 700);
+            // perform top-to-bottom flip (add PI) while paused on video
+            await animateDeltaX(Math.PI, 600); // flip down
+            await wait(1000); // stay flipped a bit
+            await animateDeltaX(-Math.PI, 600); // flip back
+            // small pause after flip
+            await wait(600);
+          }
+          phase = "images";
         }
-
-        await wait(1000); // visible pause
-        idx = (idx + 1) % 6;
       }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [autoFlip]);
+  }, [autoFlip, showImage, showVideo]);
 
   return (
     <div className="w-full h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-black relative overflow-hidden font-sans">
