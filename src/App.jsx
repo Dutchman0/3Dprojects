@@ -983,7 +983,7 @@ export default function NFTCubeInterface() {
               className="w-full rounded-lg"
               controls
               autoPlay
-              src="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
+              src="https://dweb.link/ipfs/QmWwJGxtuGmGWVUnQes2DYQvidQDNfCYrjAaw37iYCiVMN"
             >
               Your browser does not support the video tag.
             </video>
@@ -1098,5 +1098,6 @@ export default function NFTCubeInterface() {
 function stageScene(scene) {
   return scene;
 }
+
 
 
