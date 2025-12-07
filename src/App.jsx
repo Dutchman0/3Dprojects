@@ -38,7 +38,7 @@ const FACE_VIDEOS = [
   // face index 4 (Face 5)
   "https://dweb.link/ipfs/QmWwJGxtuGmGWVUnQes2DYQvidQDNfCYrjAaw37iYCiVMN",
   // face index 5 (Face 6) — set a different video URL here
-  "https://dweb.link/QmTPriMCheQZ6H7uvPo1kQB2uoWYWQkpQViYdgr7rwSri7",
+  "https://dweb.link/ipfs/QmTPriMCheQZ6H7uvPo1kQB2uoWYWQkpQViYdgr7rwSri7",
 ];
 
 const CHARACTER_COLORS = [
@@ -1156,3 +1156,4 @@ export default function NFTCubeInterface() {
 function stageScene(scene) {
   return scene;
 }
+
