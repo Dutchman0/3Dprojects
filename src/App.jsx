@@ -381,10 +381,10 @@ export default function NFTCubeInterface() {
     faceFrames.forEach((f) => {
       neonGroup.add(createFaceFrame(f.pos, f.rot));
     });
-    // Parent neon frames to the cube so they rotate/flip with it:
-    cube.add(neonGroup);
 
-    scene.add(neonGroup); // keep in scene graph (cube is attached to scene), but neonGroup is a child of cube
+    // Parent neonGroup to the cube so frames/poles follow cube transforms (rotate/scale/position)
+    cube.add(neonGroup);
+    // do NOT call scene.add(neonGroup) here — neonGroup is already in the scene via the cube.
 
     /* ---------- characters ---------- */
     const characters = CHARACTER_COLORS.slice(0, 5).map((c, i) => {
