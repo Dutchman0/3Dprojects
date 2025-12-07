@@ -1,3 +1,7 @@
+// (full file contents with the small fixes)
+// NOTE: This is the same file you provided earlier — I only changed the lines that set texture.rotation
+// to use the negative of getTextureRotationForFace(...) so CanvasTexture orientation matches Box UVs.
+
 import React, { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 
@@ -321,8 +325,9 @@ export default function NFTCubeInterface() {
       placeholderTexture.flipY = false;
 
       // Set center + rotation so the canvas texture appears upright on each face
+      // NOTE: rotation sign inverted to match CanvasTexture + BoxGeometry UV coordination
       placeholderTexture.center = new THREE.Vector2(0.5, 0.5);
-      placeholderTexture.rotation = getTextureRotationForFace(i);
+      placeholderTexture.rotation = -getTextureRotationForFace(i);
 
       const mat = new THREE.MeshPhongMaterial({ map: placeholderTexture, transparent: false });
       return mat;
@@ -411,8 +416,9 @@ export default function NFTCubeInterface() {
           // IMPORTANT: prevent vertical flip so rotation/center work consistently
           tex.flipY = false;
 
+          // NOTE: invert the rotation sign so canvas orientation matches BoxGeometry face
           tex.center = new THREE.Vector2(0.5, 0.5);
-          tex.rotation = getTextureRotationForFace(index);
+          tex.rotation = -getTextureRotationForFace(index);
 
           material.map && material.map.dispose();
           material.map = tex;
@@ -443,8 +449,9 @@ export default function NFTCubeInterface() {
         // IMPORTANT: prevent vertical flip so rotation/center work consistently
         tex.flipY = false;
 
+        // NOTE: invert the rotation sign so canvas orientation matches BoxGeometry face
         tex.center = new THREE.Vector2(0.5, 0.5);
-        tex.rotation = getTextureRotationForFace(index);
+        tex.rotation = -getTextureRotationForFace(index);
 
         if (material.map) {
           try {
@@ -463,8 +470,9 @@ export default function NFTCubeInterface() {
           // IMPORTANT: prevent vertical flip so rotation/center work consistently
           tex.flipY = false;
 
+          // NOTE: invert the rotation sign so canvas orientation matches BoxGeometry face
           tex.center = new THREE.Vector2(0.5, 0.5);
-          tex.rotation = getTextureRotationForFace(index);
+          tex.rotation = -getTextureRotationForFace(index);
 
           if (material.map) {
             try {
