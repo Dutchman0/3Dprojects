@@ -153,6 +153,31 @@ function drawFaceCanvas({ index, faceImageBitmap = null, width = 1024, height = 
   return canvas;
 }
 
+/* ---------- per-face texture rotation helper ----------
+   This compensates for BoxGeometry UV orientation so textures
+   appear upright on every face. The BoxGeometry material index
+   order is: +X, -X, +Y, -Y, +Z, -Z (0..5). */
+function getTextureRotationForFace(index) {
+  // These values were chosen to make overlay text upright for each face.
+  // Tweak if you see a face still rotated—small adjustments are fine.
+  switch (index) {
+    case 0: // +X
+      return Math.PI / 2;
+    case 1: // -X
+      return -Math.PI / 2;
+    case 2: // +Y (top)
+      return Math.PI; // flip so top text reads upright
+    case 3: // -Y (bottom)
+      return 0;
+    case 4: // +Z (front)
+      return 0;
+    case 5: // -Z (back)
+      return Math.PI;
+    default:
+      return 0;
+  }
+}
+
 /* ---------- main component ---------- */
 export default function NFTCubeInterface() {
   const mountRef = useRef(null);
@@ -176,6 +201,9 @@ export default function NFTCubeInterface() {
   const [showVideo, setShowVideo] = useState(false);
   const [showImage, setShowImage] = useState(false);
   const videoRef = useRef(null);
+
+  // auto flip state — clicking disables auto flip (user interaction wins)
+  const [autoFlip, setAutoFlip] = useState(true);
 
   useEffect(() => {
     if (!mountRef.current) return;
@@ -293,6 +321,11 @@ export default function NFTCubeInterface() {
       const placeholderCanvas = drawFaceCanvas({ index: i, faceImageBitmap: null, width: 1024, height: 1024 });
       const placeholderTexture = new THREE.CanvasTexture(placeholderCanvas);
       placeholderTexture.encoding = THREE.sRGBEncoding;
+
+      // Set center + rotation so the canvas texture appears upright on each face
+      placeholderTexture.center = new THREE.Vector2(0.5, 0.5);
+      placeholderTexture.rotation = getTextureRotationForFace(i);
+
       const mat = new THREE.MeshPhongMaterial({ map: placeholderTexture, transparent: false });
       return mat;
     });
@@ -375,6 +408,10 @@ export default function NFTCubeInterface() {
           const canvas = drawFaceCanvas({ index, faceImageBitmap: null, width: 1024, height: 1024 });
           const tex = new THREE.CanvasTexture(canvas);
           tex.encoding = THREE.sRGBEncoding;
+
+          tex.center = new THREE.Vector2(0.5, 0.5);
+          tex.rotation = getTextureRotationForFace(index);
+
           material.map && material.map.dispose();
           material.map = tex;
           material.needsUpdate = true;
@@ -404,6 +441,10 @@ export default function NFTCubeInterface() {
         const tex = new THREE.CanvasTexture(canvas);
         tex.encoding = THREE.sRGBEncoding;
 
+        // ensure correct center/rotation for upright text
+        tex.center = new THREE.Vector2(0.5, 0.5);
+        tex.rotation = getTextureRotationForFace(index);
+
         // dispose previous
         if (material.map) {
           try {
@@ -419,6 +460,10 @@ export default function NFTCubeInterface() {
           const canvas = drawFaceCanvas({ index, faceImageBitmap: null, width: 1024, height: 1024 });
           const tex = new THREE.CanvasTexture(canvas);
           tex.encoding = THREE.sRGBEncoding;
+
+          tex.center = new THREE.Vector2(0.5, 0.5);
+          tex.rotation = getTextureRotationForFace(index);
+
           if (material.map) {
             try {
               if (material.map.dispose) material.map.dispose();
@@ -442,6 +487,9 @@ export default function NFTCubeInterface() {
 
     /* ---------- interaction handlers ---------- */
     const onClick = (ev) => {
+      // user interaction stops auto flip so they can inspect
+      setAutoFlip(false);
+
       if (!mountEl) return;
       const rect = mountEl.getBoundingClientRect();
       mouseRef.current.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
@@ -678,7 +726,89 @@ export default function NFTCubeInterface() {
     return () => { if (raf) cancelAnimationFrame(raf); };
   }, [selectedFace, showVideo, showImage]);
 
+  // helper: target cube rotations per face so that each face points to camera (+Z)
+  // Note: BoxGeometry material order: +X(0), -X(1), +Y(2), -Y(3), +Z(4), -Z(5)
+  const faceTargetRotations = [
+    { x: 0, y: -Math.PI / 2 }, // +X -> rotate Y -90
+    { x: 0, y: Math.PI / 2 }, // -X -> rotate Y +90
+    { x: Math.PI / 2, y: 0 }, // +Y (top) -> rotate X +90
+    { x: -Math.PI / 2, y: 0 }, // -Y (bottom) -> rotate X -90
+    { x: 0, y: 0 }, // +Z front
+    { x: 0, y: Math.PI }, // -Z back
+  ];
+
   const currentBorderColor = selectedFace !== null ? BORDER_COLORS[selectedFace] : "rgba(204,68,42,0.5)";
+
+  /* ---------- auto flip-through effect ----------
+     Rotates the cube to show each face in sequence. When a video-face (4 or 5)
+     is reached, perform a top-to-bottom flip animation. The autoFlip state can
+     be disabled by clicking the scene (user interaction). */
+  useEffect(() => {
+    if (!autoFlip) return;
+    const cube = cubeRef.current;
+    if (!cube) return;
+
+    let cancelled = false;
+
+    const wait = (ms) => new Promise((res) => setTimeout(res, ms));
+
+    const animateRotationTo = (target, dur = 800) => {
+      return new Promise((res) => {
+        const startRot = { x: cube.rotation.x, y: cube.rotation.y };
+        const start = performance.now();
+        const step = (now) => {
+          if (cancelled) return res();
+          const t = Math.min(1, (now - start) / dur);
+          const ease = 1 - Math.pow(1 - t, 3);
+          cube.rotation.x = startRot.x + (target.x - startRot.x) * ease;
+          cube.rotation.y = startRot.y + (target.y - startRot.y) * ease;
+          if (t < 1) requestAnimationFrame(step);
+          else res();
+        };
+        requestAnimationFrame(step);
+      });
+    };
+
+    const animateDeltaX = (delta, dur = 600) => {
+      return new Promise((res) => {
+        const startX = cube.rotation.x;
+        const start = performance.now();
+        const step = (now) => {
+          if (cancelled) return res();
+          const t = Math.min(1, (now - start) / dur);
+          const ease = 1 - Math.pow(1 - t, 3);
+          cube.rotation.x = startX + delta * ease;
+          if (t < 1) requestAnimationFrame(step);
+          else res();
+        };
+        requestAnimationFrame(step);
+      });
+    };
+
+    (async () => {
+      let idx = 0;
+      while (!cancelled) {
+        const target = faceTargetRotations[idx];
+        await animateRotationTo(target, 900);
+
+        // if this is a video face (index 4 or 5 per your logic), do a top-to-bottom flip
+        if (idx === 4 || idx === 5) {
+          // flip down (add PI)
+          await animateDeltaX(Math.PI, 600);
+          await wait(700);
+          // flip back
+          await animateDeltaX(-Math.PI, 600);
+        }
+
+        await wait(1000); // visible pause
+        idx = (idx + 1) % 6;
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [autoFlip]);
 
   return (
     <div className="w-full h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-black relative overflow-hidden font-sans">
@@ -707,7 +837,7 @@ export default function NFTCubeInterface() {
                 setShowImage(false);
                 setSelectedFace(null);
               }}
-              className="absolute -top-4 -right-4 w-10 h-10 md:w-12 md:h-12 bg-red-500 text-white rounded-full hover:bg-red-600 transition-transform hover:scale-105 shadow-xl flex items-center justify-center text-2xl font-bold"
+              className="absolute -top-4 -right-4 w-10 h-10 md:w-12 md:h-12 bg-red-500 text-white rounded-full hover:bg-red-600 transition-transform hover:scale-105 shadow-xl flex items-center justify-center"
             >
               ×
             </button>
@@ -745,7 +875,7 @@ export default function NFTCubeInterface() {
                   videoRef.current.currentTime = 0;
                 }
               }}
-              className="absolute -top-4 -right-4 w-10 h-10 md:w-12 md:h-12 bg-red-500 text-white rounded-full hover:bg-red-600 transition-transform hover:scale-105 shadow-xl flex items-center justify-center text-2xl font-bold"
+              className="absolute -top-4 -right-4 w-10 h-10 md:w-12 md:h-12 bg-red-500 text-white rounded-full hover:bg-red-600 transition-transform hover:scale-105 shadow-xl flex items-center justify-center"
             >
               ×
             </button>
@@ -784,12 +914,13 @@ export default function NFTCubeInterface() {
             setSelectedFace(null);
             setShowVideo(false);
             setShowImage(false);
+            setAutoFlip(true); // re-enable autoFlip when returning to spinning cube
             if (videoRef.current) {
               videoRef.current.pause();
               videoRef.current.currentTime = 0;
             }
           }}
-          className="absolute bottom-4 left-1/2 transform -translate-x-1/2 px-8 py-3 text-sm md:text-base bg-gradient-to-r from-pink-500 to-cyan-500 text-white font-bold rounded-full hover:scale-105 active:scale-95 transition-all duration-300 shadow-xl z-50"
+          className="absolute bottom-4 left-1/2 transform -translate-x-1/2 px-8 py-3 text-sm md:text-base bg-gradient-to-r from-pink-500 to-cyan-500 text-white font-bold rounded-full hover:scale-105 shadow-xl z-40"
         >
           <svg className="w-5 h-5 inline mr-2 -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 14l9-5-9-5-9 5 9 5z"></path>
