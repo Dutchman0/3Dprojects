@@ -723,12 +723,13 @@ export default function NFTCubeInterface() {
 
   const currentBorderColor = selectedFace !== null ? BORDER_COLORS[selectedFace] : "rgba(204,68,42,0.5)";
 
-  /* ---------- new: phase-based flip-through effect ----------
+  /* ---------- new: phase-based flip-through effect (slower / fluid) ----------
      Behavior:
      - Two phases: "images" (faces that have FACE_IMAGES) and "videos" (faces 4 & 5)
      - Cycle through all image faces (pause at each), then cycle through all video faces (top-to-bottom flip for each),
        then repeat image phase, etc.
      - Clicking the scene disables autoFlip (so user can inspect). Opening an image/video also pauses.
+     - Durations and easing adjusted to be slower and more fluid.
   */
   useEffect(() => {
     // don't run auto flip while inspector is open
@@ -748,33 +749,40 @@ export default function NFTCubeInterface() {
 
     const wait = (ms) => new Promise((res) => setTimeout(res, ms));
 
-    const animateRotationTo = (target, dur = 800) => {
+    // smoother easeInOutCubic
+    const easeInOutCubic = (t) => {
+      return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    };
+
+    // animate rotation to target using easeInOutCubic and slower duration for fluid feel
+    const animateRotationTo = (target, dur = 1400) => {
       return new Promise((res) => {
         const startRot = { x: cube.rotation.x, y: cube.rotation.y };
         const start = performance.now();
         const step = (now) => {
           if (cancelled || !autoFlip) return res();
-          const t = Math.min(1, (now - start) / dur);
-          const ease = 1 - Math.pow(1 - t, 3);
+          const tRaw = Math.min(1, (now - start) / dur);
+          const ease = easeInOutCubic(tRaw);
           cube.rotation.x = startRot.x + (target.x - startRot.x) * ease;
           cube.rotation.y = startRot.y + (target.y - startRot.y) * ease;
-          if (t < 1) requestAnimationFrame(step);
+          if (tRaw < 1) requestAnimationFrame(step);
           else res();
         };
         requestAnimationFrame(step);
       });
     };
 
-    const animateDeltaX = (delta, dur = 600) => {
+    // animate an X delta (for flip) with slower duration and same easing
+    const animateDeltaX = (delta, dur = 1200) => {
       return new Promise((res) => {
         const startX = cube.rotation.x;
         const start = performance.now();
         const step = (now) => {
           if (cancelled || !autoFlip) return res();
-          const t = Math.min(1, (now - start) / dur);
-          const ease = 1 - Math.pow(1 - t, 3);
+          const tRaw = Math.min(1, (now - start) / dur);
+          const ease = easeInOutCubic(tRaw);
           cube.rotation.x = startX + delta * ease;
-          if (t < 1) requestAnimationFrame(step);
+          if (tRaw < 1) requestAnimationFrame(step);
           else res();
         };
         requestAnimationFrame(step);
@@ -794,11 +802,11 @@ export default function NFTCubeInterface() {
           for (let idx of imageFaces) {
             if (cancelled || !autoFlip) break;
             const target = faceTargetRotations[idx];
-            await animateRotationTo(target, 700);
+            await animateRotationTo(target, 1400); // slower rotation
             // small settle
-            await wait(900);
-            // brief pause while visible
-            await wait(600);
+            await wait(800);
+            // visible pause
+            await wait(1200);
           }
           phase = "videos";
         } else {
@@ -810,13 +818,13 @@ export default function NFTCubeInterface() {
           for (let idx of videoFaces) {
             if (cancelled || !autoFlip) break;
             const target = faceTargetRotations[idx];
-            await animateRotationTo(target, 700);
+            await animateRotationTo(target, 1400); // slower rotation
             // perform top-to-bottom flip (add PI) while paused on video
-            await animateDeltaX(Math.PI, 600); // flip down
-            await wait(1000); // stay flipped a bit
-            await animateDeltaX(-Math.PI, 600); // flip back
+            await animateDeltaX(Math.PI, 1200); // slower flip down
+            await wait(1600); // stay flipped a bit (longer so the flip feels intentional)
+            await animateDeltaX(-Math.PI, 1200); // flip back smoothly
             // small pause after flip
-            await wait(600);
+            await wait(1000);
           }
           phase = "images";
         }
