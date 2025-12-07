@@ -1,7 +1,3 @@
-// Updated to automatically resume flip-through after 5s of no user interaction.
-// Key change: introduce inactivity timer and call `handleUserInteraction()` on pointer events.
-// The rest of the file is unchanged except for wiring the interaction handler into existing click logic.
-
 import React, { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 
@@ -31,6 +27,18 @@ const BORDER_COLORS = [
   "#CC442A",
   "#0055FF",
   "#9D00FF",
+];
+
+/* ---------- per-face video URLs (index 4 and 5 are the video faces) ---------- */
+const FACE_VIDEOS = [
+  null,
+  null,
+  null,
+  null,
+  // face index 4 (Face 5)
+  "https://dweb.link/ipfs/QmWwJGxtuGmGWVUnQes2DYQvidQDNfCYrjAaw37iYCiVMN",
+  // face index 5 (Face 6) — set a different video URL here
+  "https://dweb.link/QmTPriMCheQZ6H7uvPo1kQB2uoWYWQkpQViYdgr7rwSri7",
 ];
 
 const CHARACTER_COLORS = [
@@ -206,9 +214,22 @@ export default function NFTCubeInterface() {
 
   // auto flip state — clicking disables auto flip (user interaction wins)
   const [autoFlip, setAutoFlip] = useState(true);
+  const autoFlipRef = useRef(autoFlip);
 
   // inactivity timer ref (used to resume autoFlip after timeout)
   const inactivityTimeoutRef = useRef(null);
+
+  // keep track of in-flight fetch controllers & scheduled timeouts so we can abort/clear on unmount
+  const fetchControllersRef = useRef(new Set());
+  const scheduledLoadTimeoutsRef = useRef([]);
+
+  // small guard to avoid calling setAutoFlip(false) on every pointermove flood
+  const lastPointerInteractionRef = useRef(0);
+
+  // keep autoFlipRef in sync with state
+  useEffect(() => {
+    autoFlipRef.current = autoFlip;
+  }, [autoFlip]);
 
   useEffect(() => {
     if (!mountRef.current) return;
@@ -240,8 +261,19 @@ export default function NFTCubeInterface() {
     };
 
     const handleUserInteraction = () => {
-      // stop auto flipping immediately while the user interacts
-      setAutoFlip(false);
+      // throttle to avoid spamming setState on pointermove
+      const now = Date.now();
+      if (now - lastPointerInteractionRef.current < 120) {
+        // ignore too-frequent interactions (120ms)
+        // still refresh the inactivity timer though
+        if (!inactivityTimeoutRef.current) scheduleResumeAutoFlip();
+        return;
+      }
+      lastPointerInteractionRef.current = now;
+
+      // only toggle state if it was true (avoid repeated re-renders)
+      if (autoFlipRef.current) setAutoFlip(false);
+
       // schedule resume after SNOOZE_MS of inactivity
       scheduleResumeAutoFlip();
     };
@@ -445,6 +477,9 @@ export default function NFTCubeInterface() {
 
     /* ---------- robust face texture loader ---------- */
     const loadFaceTexture = async (index, url, material) => {
+      const controller = new AbortController();
+      fetchControllersRef.current.add(controller);
+
       try {
         if (!url) {
           const canvas = drawFaceCanvas({ index, faceImageBitmap: null, width: 1024, height: 1024 });
@@ -471,7 +506,6 @@ export default function NFTCubeInterface() {
           return;
         }
 
-        const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 6000);
 
         const resp = await fetch(url, { mode: "cors", signal: controller.signal });
@@ -514,6 +548,7 @@ export default function NFTCubeInterface() {
         material.map = tex;
         material.needsUpdate = true;
       } catch (err) {
+        // fallback to canvas-only texture on any failure
         try {
           const canvas = drawFaceCanvas({ index, faceImageBitmap: null, width: 1024, height: 1024 });
           const tex = new THREE.CanvasTexture(canvas);
@@ -543,14 +578,17 @@ export default function NFTCubeInterface() {
         } catch (e) {
           // suppress
         }
+      } finally {
+        fetchControllersRef.current.delete(controller);
       }
     };
 
     // Kick off async loading for each face (non-blocking)
     placeholderMaterials.forEach((mat, idx) => {
-      setTimeout(() => {
+      const t = setTimeout(() => {
         loadFaceTexture(idx, FACE_IMAGES[idx], mat);
       }, idx * 150);
+      scheduledLoadTimeoutsRef.current.push(t);
     });
 
     /* ---------- interaction handlers ---------- */
@@ -662,9 +700,28 @@ export default function NFTCubeInterface() {
       if (resizeObserver) resizeObserver.disconnect();
       else window.removeEventListener("resize", onResize);
 
-      clearInactivityTimer();
+      if (inactivityTimeoutRef.current) {
+        clearTimeout(inactivityTimeoutRef.current);
+        inactivityTimeoutRef.current = null;
+      }
 
       if (animationIdRef.current) cancelAnimationFrame(animationIdRef.current);
+
+      // abort any in-flight fetches
+      try {
+        fetchControllersRef.current.forEach((c) => {
+          try {
+            c.abort();
+          } catch (e) {}
+        });
+        fetchControllersRef.current.clear();
+      } catch (e) {}
+
+      // clear scheduled load timeouts
+      try {
+        scheduledLoadTimeoutsRef.current.forEach((t) => clearTimeout(t));
+        scheduledLoadTimeoutsRef.current = [];
+      } catch (e) {}
 
       try {
         // dispose background points
@@ -742,6 +799,7 @@ export default function NFTCubeInterface() {
         if (rendererRef.current) {
           try { rendererRef.current.dispose(); } catch (e) {}
           if (rendererRef.current.domElement && mountEl.contains(rendererRef.current.domElement)) {
+            try { rendererRef.current.domElement.removeEventListener("webglcontextlost", onContextLost); } catch (e) {}
             try { mountEl.removeChild(rendererRef.current.domElement); } catch (e) {}
           }
         }
@@ -848,7 +906,7 @@ export default function NFTCubeInterface() {
         const startRot = { x: cube.rotation.x, y: cube.rotation.y };
         const start = performance.now();
         const step = (now) => {
-          if (cancelled || !autoFlip) return res();
+          if (cancelled || !autoFlipRef.current) return res();
           const tRaw = Math.min(1, (now - start) / dur);
           const ease = easeInOutCubic(tRaw);
           cube.rotation.x = startRot.x + (target.x - startRot.x) * ease;
@@ -866,7 +924,7 @@ export default function NFTCubeInterface() {
         const startX = cube.rotation.x;
         const start = performance.now();
         const step = (now) => {
-          if (cancelled || !autoFlip) return res();
+          if (cancelled || !autoFlipRef.current) return res();
           const tRaw = Math.min(1, (now - start) / dur);
           const ease = easeInOutCubic(tRaw);
           cube.rotation.x = startX + delta * ease;
@@ -880,7 +938,7 @@ export default function NFTCubeInterface() {
     // main async loop
     (async () => {
       let phase = "images"; // start with images
-      while (!cancelled && autoFlip) {
+      while (!cancelled && autoFlipRef.current) {
         if (phase === "images") {
           if (imageFaces.length === 0) {
             phase = "videos";
@@ -888,7 +946,7 @@ export default function NFTCubeInterface() {
           }
           // cycle through image faces
           for (let idx of imageFaces) {
-            if (cancelled || !autoFlip) break;
+            if (cancelled || !autoFlipRef.current) break;
             const target = faceTargetRotations[idx];
             await animateRotationTo(target, 1400); // slower rotation
             // small settle
@@ -904,7 +962,7 @@ export default function NFTCubeInterface() {
             continue;
           }
           for (let idx of videoFaces) {
-            if (cancelled || !autoFlip) break;
+            if (cancelled || !autoFlipRef.current) break;
             const target = faceTargetRotations[idx];
             await animateRotationTo(target, 1400); // slower rotation
             // perform top-to-bottom flip (add PI) while paused on video
@@ -950,13 +1008,11 @@ export default function NFTCubeInterface() {
               onClick={() => {
                 setShowImage(false);
                 setSelectedFace(null);
-                // when closing the image viewer, schedule resume after SNOOZE_MS
-                // (this prevents the flip from immediately taking over while the user might still be reading)
+                // clear any existing inactivity timer and resume flipping immediately
                 if (inactivityTimeoutRef.current) {
                   clearTimeout(inactivityTimeoutRef.current);
                   inactivityTimeoutRef.current = null;
                 }
-                // resume flipping immediately (or you could scheduleResumeAutoFlip() here instead)
                 setAutoFlip(true);
               }}
               className="absolute -top-4 -right-4 w-10 h-10 md:w-12 md:h-12 bg-red-500 text-white rounded-full hover:bg-red-600 transition-transform hover:scale-105 shadow-xl flex items-center justify-center"
@@ -967,7 +1023,7 @@ export default function NFTCubeInterface() {
         </div>
       )}
 
-      {showVideo && (
+      {showVideo && selectedFace !== null && FACE_VIDEOS[selectedFace] && (
         <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-80 z-30 p-4">
           <div
             className="relative w-full max-w-4xl rounded-xl p-2"
@@ -978,12 +1034,14 @@ export default function NFTCubeInterface() {
               borderWidth: "4px",
             }}
           >
+            {/* key={selectedFace} forces the <video> to remount when face changes so autoplay behaves predictably */}
             <video
+              key={selectedFace}
               ref={videoRef}
               className="w-full rounded-lg"
               controls
               autoPlay
-              src="https://dweb.link/ipfs/QmWwJGxtuGmGWVUnQes2DYQvidQDNfCYrjAaw37iYCiVMN"
+              src={FACE_VIDEOS[selectedFace]}
             >
               Your browser does not support the video tag.
             </video>
@@ -1098,6 +1156,3 @@ export default function NFTCubeInterface() {
 function stageScene(scene) {
   return scene;
 }
-
-
-
