@@ -36,7 +36,7 @@ const FACE_VIDEOS = [
   null,
   null,
   "https://dweb.link/ipfs/QmWwJGxtuGmGWVUnQes2DYQvidQDNfCYrjAaw37iYCiVMN",
-  "https://dweb.link/ipfs/QmYwKjExampleDifferentVideoHashForFace6",
+  "https://dweb.link/ipfs/QmTPriMCheQZ6H7uvPo1kQB2uoWYWQkpQViYdgr7rwSri7",
 ];
 
 const CHARACTER_COLORS = [
@@ -1107,3 +1107,4 @@ export default function NFTCubeInterface() {
 function stageScene(scene) {
   return scene;
 }
+
