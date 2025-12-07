@@ -16,8 +16,8 @@ const FACE_LABELS = [
   "AH Logo",
   "Certificate",
   "Nameplate",
-  "Highlight Video",
-  "Behind The Scenes",
+  "Animated Video",
+  "Tommy Address To Fans",
 ];
 
 const BORDER_COLORS = [
@@ -1156,4 +1156,5 @@ export default function NFTCubeInterface() {
 function stageScene(scene) {
   return scene;
 }
+
 
