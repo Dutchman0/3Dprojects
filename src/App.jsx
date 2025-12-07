@@ -546,11 +546,9 @@ export default function NFTCubeInterface() {
       const cubeLocal = cubeRef.current;
       if (!cubeLocal) return;
 
+      // Removed continuous spinning: cube rotation is now driven ONLY by the phase-based flip effect.
+      // Keep visual pulses and character scaling but do not alter cube.rotation here.
       if (selectedFace === null && !showVideo && !showImage) {
-        cubeLocal.rotation.x += 0.00012 * dt;
-        cubeLocal.rotation.y += 0.00024 * dt;
-        if (neonGroupRef.current) neonGroupRef.current.rotation.copy(cubeLocal.rotation);
-
         const pulse = Math.sin(now * 0.003) * 0.3 + 0.7;
         edgesRef.current.forEach((edge) => {
           if (edge.material) edge.material.opacity = pulse;
@@ -934,7 +932,7 @@ export default function NFTCubeInterface() {
             setSelectedFace(null);
             setShowVideo(false);
             setShowImage(false);
-            setAutoFlip(true); // re-enable autoFlip when returning to spinning cube
+            setAutoFlip(true); // re-enable autoFlip when returning to flip-through
             if (videoRef.current) {
               videoRef.current.pause();
               videoRef.current.currentTime = 0;
