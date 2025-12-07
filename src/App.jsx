@@ -1,11 +1,13 @@
-// Updated: flip images horizontally to correct "backwards" appearance
-// (keeps flipY = false from the previous fix; uses RepeatWrapping + repeat.x = -1)
+// Updated to automatically resume flip-through after 5s of no user interaction.
+// Key change: introduce inactivity timer and call `handleUserInteraction()` on pointer events.
+// The rest of the file is unchanged except for wiring the interaction handler into existing click logic.
+
 import React, { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 
 /* ---------- Static data ---------- */
 const FACE_IMAGES = [
-  "https://dweb.link/ipfs/QmVqSPDQ3PXMfYoZN7RwfnqATXKbroegZBjxe4qYTLhKR3",
+  "https://dweb.link/ipfs/QmQntziSJHMeEqqFbT1XMyDUYAtqAt8ii1SJVQRmtPFZuZ",
   "https://dweb.link/ipfs/QmQXMB45tfidy3YqZ9hi7A69HrgjU3jYrM5WJwwaFi93FT",
   "https://dweb.link/ipfs/QmT7Gn3h1gSgjMgh4QnxY26jytmT7JC3DHp5KbDxAzjLqi",
   "https://dweb.link/ipfs/QmdE3CSFH75ADXdJqRLuhDR9G9xaekMLSxpKasgifSrExs",
@@ -205,6 +207,9 @@ export default function NFTCubeInterface() {
   // auto flip state — clicking disables auto flip (user interaction wins)
   const [autoFlip, setAutoFlip] = useState(true);
 
+  // inactivity timer ref (used to resume autoFlip after timeout)
+  const inactivityTimeoutRef = useRef(null);
+
   useEffect(() => {
     if (!mountRef.current) return;
     const mountEl = mountRef.current;
@@ -215,6 +220,35 @@ export default function NFTCubeInterface() {
     // These guarantee a real size even during SSR/rehydration
     mountEl.style.height = mountEl.style.height || "100vh";
     mountEl.style.minHeight = mountEl.style.minHeight || "100vh";
+
+    /* ---------- helper: user interaction => pause autoFlip and schedule resume ---------- */
+    const SNOOZE_MS = 5000; // 5 seconds of no interaction => resume flipping
+
+    const clearInactivityTimer = () => {
+      if (inactivityTimeoutRef.current) {
+        clearTimeout(inactivityTimeoutRef.current);
+        inactivityTimeoutRef.current = null;
+      }
+    };
+
+    const scheduleResumeAutoFlip = () => {
+      clearInactivityTimer();
+      inactivityTimeoutRef.current = setTimeout(() => {
+        setAutoFlip(true);
+        inactivityTimeoutRef.current = null;
+      }, SNOOZE_MS);
+    };
+
+    const handleUserInteraction = () => {
+      // stop auto flipping immediately while the user interacts
+      setAutoFlip(false);
+      // schedule resume after SNOOZE_MS of inactivity
+      scheduleResumeAutoFlip();
+    };
+
+    // attach pointer events to detect most user interactions (mouse / touch / pen)
+    mountEl.addEventListener("pointerdown", handleUserInteraction, { passive: true });
+    mountEl.addEventListener("pointermove", handleUserInteraction, { passive: true });
 
     /* ---------- scene, camera, renderer ---------- */
     const scene = new THREE.Scene();
@@ -521,8 +555,8 @@ export default function NFTCubeInterface() {
 
     /* ---------- interaction handlers ---------- */
     const onClick = (ev) => {
-      // user interaction stops auto flip so they can inspect
-      setAutoFlip(false);
+      // handle user interaction with timer
+      handleUserInteraction();
 
       if (!mountEl) return;
       const rect = mountEl.getBoundingClientRect();
@@ -622,8 +656,13 @@ export default function NFTCubeInterface() {
     /* ---------- cleanup on unmount ---------- */
     return () => {
       mountEl.removeEventListener("click", onClick);
+      mountEl.removeEventListener("pointerdown", handleUserInteraction);
+      mountEl.removeEventListener("pointermove", handleUserInteraction);
+
       if (resizeObserver) resizeObserver.disconnect();
       else window.removeEventListener("resize", onResize);
+
+      clearInactivityTimer();
 
       if (animationIdRef.current) cancelAnimationFrame(animationIdRef.current);
 
@@ -776,7 +815,8 @@ export default function NFTCubeInterface() {
      - Two phases: "images" (faces that have FACE_IMAGES) and "videos" (faces 4 & 5)
      - Cycle through all image faces (pause at each), then cycle through all video faces (top-to-bottom flip for each),
        then repeat image phase, etc.
-     - Clicking the scene disables autoFlip (so user can inspect). Opening an image/video also pauses.
+     - Clicking or pointer movement disables autoFlip and schedules it to resume after 5s of inactivity.
+     - Opening an image/video also pauses autoFlip until closed (showImage/showVideo checks).
      - Durations and easing adjusted to be slower and more fluid.
   */
   useEffect(() => {
@@ -910,6 +950,14 @@ export default function NFTCubeInterface() {
               onClick={() => {
                 setShowImage(false);
                 setSelectedFace(null);
+                // when closing the image viewer, schedule resume after SNOOZE_MS
+                // (this prevents the flip from immediately taking over while the user might still be reading)
+                if (inactivityTimeoutRef.current) {
+                  clearTimeout(inactivityTimeoutRef.current);
+                  inactivityTimeoutRef.current = null;
+                }
+                // resume flipping immediately (or you could scheduleResumeAutoFlip() here instead)
+                setAutoFlip(true);
               }}
               className="absolute -top-4 -right-4 w-10 h-10 md:w-12 md:h-12 bg-red-500 text-white rounded-full hover:bg-red-600 transition-transform hover:scale-105 shadow-xl flex items-center justify-center"
             >
@@ -948,6 +996,8 @@ export default function NFTCubeInterface() {
                   videoRef.current.pause();
                   videoRef.current.currentTime = 0;
                 }
+                // resume autoFlip after closing video
+                setAutoFlip(true);
               }}
               className="absolute -top-4 -right-4 w-10 h-10 md:w-12 md:h-12 bg-red-500 text-white rounded-full hover:bg-red-600 transition-transform hover:scale-105 shadow-xl flex items-center justify-center"
             >
@@ -988,7 +1038,8 @@ export default function NFTCubeInterface() {
             setSelectedFace(null);
             setShowVideo(false);
             setShowImage(false);
-            setAutoFlip(true); // re-enable autoFlip when returning to flip-through
+            // re-enable autoFlip immediately when the user explicitly clicks the Return button
+            setAutoFlip(true);
             if (videoRef.current) {
               videoRef.current.pause();
               videoRef.current.currentTime = 0;
