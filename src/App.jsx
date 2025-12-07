@@ -1,7 +1,5 @@
-// (full file contents with the small fixes)
-// NOTE: This is the same file you provided earlier — I only changed the lines that set texture.rotation
-// to use the negative of getTextureRotationForFace(...) so CanvasTexture orientation matches Box UVs.
-
+// Updated: flip images horizontally to correct "backwards" appearance
+// (keeps flipY = false from the previous fix; uses RepeatWrapping + repeat.x = -1)
 import React, { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 
@@ -324,8 +322,15 @@ export default function NFTCubeInterface() {
       // IMPORTANT: prevent vertical flip so rotation/center work consistently
       placeholderTexture.flipY = false;
 
+      // Allow using negative repeat to mirror horizontally, so enable repeat wrapping:
+      placeholderTexture.wrapS = THREE.RepeatWrapping;
+      placeholderTexture.wrapT = THREE.RepeatWrapping;
+
+      // Mirror horizontally to correct "backwards" appearance
+      placeholderTexture.repeat.set(-1, 1);
+
       // Set center + rotation so the canvas texture appears upright on each face
-      // NOTE: rotation sign inverted to match CanvasTexture + BoxGeometry UV coordination
+      // NOTE: rotation sign inverted previously to match CanvasTexture + BoxGeometry UV coordination
       placeholderTexture.center = new THREE.Vector2(0.5, 0.5);
       placeholderTexture.rotation = -getTextureRotationForFace(i);
 
@@ -392,7 +397,6 @@ export default function NFTCubeInterface() {
 
     // Parent neonGroup to the cube so frames/poles follow cube transforms (rotate/scale/position)
     cube.add(neonGroup);
-    // do NOT call scene.add(neonGroup) here — neonGroup is already in the scene via the cube.
 
     /* ---------- characters ---------- */
     const characters = CHARACTER_COLORS.slice(0, 5).map((c, i) => {
@@ -415,6 +419,13 @@ export default function NFTCubeInterface() {
 
           // IMPORTANT: prevent vertical flip so rotation/center work consistently
           tex.flipY = false;
+
+          // enable RepeatWrapping so negative repeat mirrors correctly
+          tex.wrapS = THREE.RepeatWrapping;
+          tex.wrapT = THREE.RepeatWrapping;
+
+          // Mirror horizontally to correct backwards appearance
+          tex.repeat.set(-1, 1);
 
           // NOTE: invert the rotation sign so canvas orientation matches BoxGeometry face
           tex.center = new THREE.Vector2(0.5, 0.5);
@@ -449,6 +460,13 @@ export default function NFTCubeInterface() {
         // IMPORTANT: prevent vertical flip so rotation/center work consistently
         tex.flipY = false;
 
+        // enable RepeatWrapping so negative repeat mirrors correctly
+        tex.wrapS = THREE.RepeatWrapping;
+        tex.wrapT = THREE.RepeatWrapping;
+
+        // Mirror horizontally to correct backwards appearance
+        tex.repeat.set(-1, 1);
+
         // NOTE: invert the rotation sign so canvas orientation matches BoxGeometry face
         tex.center = new THREE.Vector2(0.5, 0.5);
         tex.rotation = -getTextureRotationForFace(index);
@@ -469,6 +487,13 @@ export default function NFTCubeInterface() {
 
           // IMPORTANT: prevent vertical flip so rotation/center work consistently
           tex.flipY = false;
+
+          // enable RepeatWrapping so negative repeat mirrors correctly
+          tex.wrapS = THREE.RepeatWrapping;
+          tex.wrapT = THREE.RepeatWrapping;
+
+          // Mirror horizontally to correct backwards appearance
+          tex.repeat.set(-1, 1);
 
           // NOTE: invert the rotation sign so canvas orientation matches BoxGeometry face
           tex.center = new THREE.Vector2(0.5, 0.5);
